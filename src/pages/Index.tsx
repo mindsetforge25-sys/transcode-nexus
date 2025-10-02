@@ -3,9 +3,10 @@ import { FileCategory, CategorySelector } from "@/components/CategorySelector";
 import { FileUploader } from "@/components/FileUploader";
 import { FormatSelector } from "@/components/FormatSelector";
 import { Button } from "@/components/ui/button";
-import { Download, Sparkles, Package } from "lucide-react";
+import { Download, Sparkles, Package, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import JSZip from "jszip";
+import jsPDF from "jspdf";
 
 const Index = () => {
   const [selectedCategory, setSelectedCategory] = useState<FileCategory>("image");
@@ -44,6 +45,55 @@ const Index = () => {
     setSelectedFiles(files);
   };
 
+  const convertImagesToPDF = async (images: File[]): Promise<Blob> => {
+    const pdf = new jsPDF();
+    let isFirstPage = true;
+
+    for (const image of images) {
+      const img = await new Promise<HTMLImageElement>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const imgElement = new Image();
+          imgElement.onload = () => resolve(imgElement);
+          imgElement.src = e.target?.result as string;
+        };
+        reader.readAsDataURL(image);
+      });
+
+      if (!isFirstPage) {
+        pdf.addPage();
+      }
+      isFirstPage = false;
+
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imgRatio = img.width / img.height;
+      const pageRatio = pageWidth / pageHeight;
+
+      let finalWidth, finalHeight;
+      if (imgRatio > pageRatio) {
+        finalWidth = pageWidth - 20;
+        finalHeight = finalWidth / imgRatio;
+      } else {
+        finalHeight = pageHeight - 20;
+        finalWidth = finalHeight * imgRatio;
+      }
+
+      const x = (pageWidth - finalWidth) / 2;
+      const y = (pageHeight - finalHeight) / 2;
+
+      const imgData = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target?.result as string);
+        reader.readAsDataURL(image);
+      });
+
+      pdf.addImage(imgData, 'JPEG', x, y, finalWidth, finalHeight);
+    }
+
+    return pdf.output('blob');
+  };
+
   const handleConvert = async () => {
     if (selectedFiles.length === 0) {
       toast({
@@ -57,8 +107,28 @@ const Index = () => {
     setIsConverting(true);
 
     try {
-      // Placeholder for actual conversion logic
-      // In a real app, this would call a backend service
+      // Special handling for image to PDF conversion
+      if (selectedCategory === "image" && outputFormat === "PDF") {
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        
+        const pdfBlob = await convertImagesToPDF(selectedFiles);
+        const url = URL.createObjectURL(pdfBlob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `converted_images_${Date.now()}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        toast({
+          title: "Conversion complete!",
+          description: `${selectedFiles.length} image${selectedFiles.length > 1 ? 's' : ''} converted to PDF`,
+        });
+        return;
+      }
+
+      // Placeholder for actual conversion logic for other formats
       await new Promise((resolve) => setTimeout(resolve, 2000));
 
       // Simulate converted files
@@ -169,7 +239,15 @@ const Index = () => {
             {/* Convert Button */}
             {selectedFiles.length > 0 && (
               <div className="animate-scale-in space-y-3">
-                {selectedFiles.length > 1 && (
+                {selectedCategory === "image" && outputFormat === "PDF" && (
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/10 border border-primary/20">
+                    <FileText className="w-4 h-4 text-primary" />
+                    <p className="text-sm font-medium text-primary">
+                      {selectedFiles.length} image{selectedFiles.length > 1 ? 's' : ''} will be combined into a single PDF
+                    </p>
+                  </div>
+                )}
+                {selectedFiles.length > 1 && selectedCategory !== "image" && outputFormat !== "PDF" && (
                   <div className="flex items-center gap-2 p-3 rounded-lg bg-accent/10 border border-accent/20">
                     <Package className="w-4 h-4 text-accent" />
                     <p className="text-sm font-medium text-accent">

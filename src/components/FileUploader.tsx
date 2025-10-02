@@ -1,4 +1,4 @@
-import { Upload, X, File as FileIcon } from "lucide-react";
+import { Upload, X, File as FileIcon, Plus } from "lucide-react";
 import { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { Button } from "./ui/button";
@@ -15,10 +15,11 @@ export const FileUploader = ({ onFilesSelect, acceptedTypes }: FileUploaderProps
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
-      setSelectedFiles(acceptedFiles);
-      onFilesSelect(acceptedFiles);
+      const newFiles = [...selectedFiles, ...acceptedFiles];
+      setSelectedFiles(newFiles);
+      onFilesSelect(newFiles);
     }
-  }, [onFilesSelect]);
+  }, [onFilesSelect, selectedFiles]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -35,6 +36,23 @@ export const FileUploader = ({ onFilesSelect, acceptedTypes }: FileUploaderProps
   const clearAllFiles = () => {
     setSelectedFiles([]);
     onFilesSelect([]);
+  };
+
+  const openFileDialog = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = true;
+    input.accept = Object.values(acceptedTypes || {}).flat().join(',');
+    input.onchange = (e) => {
+      const target = e.target as HTMLInputElement;
+      if (target.files && target.files.length > 0) {
+        const newFiles = Array.from(target.files);
+        const allFiles = [...selectedFiles, ...newFiles];
+        setSelectedFiles(allFiles);
+        onFilesSelect(allFiles);
+      }
+    };
+    input.click();
   };
 
   return (
@@ -63,14 +81,25 @@ export const FileUploader = ({ onFilesSelect, acceptedTypes }: FileUploaderProps
         <div className="space-y-4 animate-fade-in">
           <div className="flex items-center justify-between">
             <p className="font-semibold">{selectedFiles.length} file{selectedFiles.length > 1 ? 's' : ''} selected</p>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={clearAllFiles}
-              className="hover:bg-destructive/10 hover:text-destructive"
-            >
-              Clear All
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={openFileDialog}
+                className="hover:bg-primary/10 hover:text-primary hover:border-primary"
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                Add More
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearAllFiles}
+                className="hover:bg-destructive/10 hover:text-destructive"
+              >
+                Clear All
+              </Button>
+            </div>
           </div>
           <ScrollArea className="h-[200px] pr-4">
             <div className="space-y-2">

@@ -10,7 +10,7 @@ interface FormatSelectorProps {
 }
 
 const formatsByCategory: Record<FileCategory, string[]> = {
-  image: ["PNG", "JPG", "JPEG", "WEBP", "GIF", "SVG", "AVIF", "BMP", "TIFF", "ICO", "HEIC"],
+  image: ["PNG", "JPG", "JPEG", "WEBP", "GIF", "SVG", "AVIF", "BMP", "TIFF", "ICO", "HEIC", "PDF"],
   video: ["MP4", "AVI", "MOV", "MKV", "WEBM", "FLV", "WMV", "M4V", "3GP"],
   audio: ["MP3", "WAV", "OGG", "AAC", "FLAC", "M4A", "WMA", "AIFF"],
   document: ["PDF", "DOCX", "DOC", "TXT", "MD", "HTML", "RTF", "ODT", "EPUB"],
