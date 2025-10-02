@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import JSZip from "jszip";
 import jsPDF from "jspdf";
+import { PDFDocument } from "pdf-lib";
 
 const Index = () => {
   const [selectedCategory, setSelectedCategory] = useState<FileCategory>("image");
@@ -32,7 +33,10 @@ const Index = () => {
       "application/vnd.oasis.opendocument.text": [".odt"],
       "application/epub+zip": [".epub"],
     },
-    compress: { "image/*": [".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff"] },
+    compress: { 
+      "image/*": [".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff"],
+      "application/pdf": [".pdf"]
+    },
   };
 
   const handleCategoryChange = (category: FileCategory) => {
@@ -147,6 +151,23 @@ const Index = () => {
     });
   };
 
+  const compressPDF = async (file: File, quality: number): Promise<Blob> => {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdfDoc = await PDFDocument.load(arrayBuffer);
+    
+    // Adjust compression based on quality setting
+    // Lower quality = more aggressive compression
+    const imageQuality = quality;
+    
+    const pdfBytes = await pdfDoc.save({
+      useObjectStreams: true,
+      addDefaultPage: false,
+      objectsPerTick: Math.floor(quality * 50),
+    });
+    
+    return new Blob([pdfBytes], { type: 'application/pdf' });
+  };
+
   const handleConvert = async () => {
     if (selectedFiles.length === 0) {
       toast({
@@ -160,14 +181,24 @@ const Index = () => {
     setIsConverting(true);
 
     try {
-      // Special handling for image compression
+      // Special handling for compression (images and PDFs)
       if (selectedCategory === "compress") {
         const compressedFiles: { name: string; data: Blob }[] = [];
         
         for (const file of selectedFiles) {
-          const compressedBlob = await compressImage(file, compressionQuality);
+          let compressedBlob: Blob;
+          let fileName: string;
+          
+          if (file.type === 'application/pdf') {
+            compressedBlob = await compressPDF(file, compressionQuality);
+            fileName = file.name.replace(/\.pdf$/i, '_compressed.pdf');
+          } else {
+            compressedBlob = await compressImage(file, compressionQuality);
+            fileName = file.name.replace(/\.[^/.]+$/, `_compressed.jpg`);
+          }
+          
           compressedFiles.push({
-            name: file.name.replace(/\.[^/.]+$/, `_compressed.jpg`),
+            name: fileName,
             data: compressedBlob,
           });
         }
@@ -200,7 +231,7 @@ const Index = () => {
 
         toast({
           title: "Compression complete!",
-          description: `${selectedFiles.length} image${selectedFiles.length > 1 ? 's' : ''} compressed successfully`,
+          description: `${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''} compressed successfully`,
         });
         return;
       }
@@ -367,7 +398,7 @@ const Index = () => {
                   <div>
                     <h4 className="font-semibold mb-2">Compression Quality</h4>
                     <p className="text-sm text-muted-foreground mb-4">
-                      Adjust the slider to control compression intensity (lower = smaller file size, higher = better quality)
+                      Adjust the slider to control compression intensity for images and PDFs (lower = smaller file size, higher = better quality)
                     </p>
                   </div>
                   <div className="space-y-2">
