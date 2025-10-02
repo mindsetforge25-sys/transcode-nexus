@@ -3,30 +3,33 @@ import { FileCategory, CategorySelector } from "@/components/CategorySelector";
 import { FileUploader } from "@/components/FileUploader";
 import { FormatSelector } from "@/components/FormatSelector";
 import { Button } from "@/components/ui/button";
-import { Download, Sparkles } from "lucide-react";
+import { Download, Sparkles, Package } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import JSZip from "jszip";
 
 const Index = () => {
   const [selectedCategory, setSelectedCategory] = useState<FileCategory>("image");
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [outputFormat, setOutputFormat] = useState("PNG");
   const [isConverting, setIsConverting] = useState(false);
   const { toast } = useToast();
 
   const acceptedTypesByCategory: Record<FileCategory, Record<string, string[]>> = {
-    image: { "image/*": [".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".avif"] },
-    video: { "video/*": [".mp4", ".avi", ".mov", ".mkv", ".webm"] },
-    audio: { "audio/*": [".mp3", ".wav", ".ogg", ".aac", ".flac"] },
+    image: { "image/*": [".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".avif", ".bmp", ".tiff", ".ico", ".heic"] },
+    video: { "video/*": [".mp4", ".avi", ".mov", ".mkv", ".webm", ".flv", ".wmv", ".m4v", ".3gp"] },
+    audio: { "audio/*": [".mp3", ".wav", ".ogg", ".aac", ".flac", ".m4a", ".wma", ".aiff"] },
     document: {
       "application/pdf": [".pdf"],
       "application/msword": [".doc", ".docx"],
-      "text/*": [".txt", ".md", ".html"],
+      "text/*": [".txt", ".md", ".html", ".rtf"],
+      "application/vnd.oasis.opendocument.text": [".odt"],
+      "application/epub+zip": [".epub"],
     },
   };
 
   const handleCategoryChange = (category: FileCategory) => {
     setSelectedCategory(category);
-    setSelectedFile(null);
+    setSelectedFiles([]);
     // Set default format for each category
     const defaultFormats: Record<FileCategory, string> = {
       image: "PNG",
@@ -37,15 +40,15 @@ const Index = () => {
     setOutputFormat(defaultFormats[category]);
   };
 
-  const handleFileSelect = (file: File) => {
-    setSelectedFile(file);
+  const handleFilesSelect = (files: File[]) => {
+    setSelectedFiles(files);
   };
 
   const handleConvert = async () => {
-    if (!selectedFile) {
+    if (selectedFiles.length === 0) {
       toast({
-        title: "No file selected",
-        description: "Please select a file to convert",
+        title: "No files selected",
+        description: "Please select at least one file to convert",
         variant: "destructive",
       });
       return;
@@ -58,10 +61,49 @@ const Index = () => {
       // In a real app, this would call a backend service
       await new Promise((resolve) => setTimeout(resolve, 2000));
 
-      toast({
-        title: "Conversion complete!",
-        description: `Your file has been converted to ${outputFormat}`,
-      });
+      // Simulate converted files
+      const convertedFiles: { name: string; data: Blob }[] = selectedFiles.map((file) => ({
+        name: file.name.replace(/\.[^/.]+$/, `.${outputFormat.toLowerCase()}`),
+        data: new Blob([file], { type: file.type }),
+      }));
+
+      // If multiple files, create a zip
+      if (convertedFiles.length > 1) {
+        const zip = new JSZip();
+        convertedFiles.forEach((file) => {
+          zip.file(file.name, file.data);
+        });
+
+        const zipBlob = await zip.generateAsync({ type: "blob" });
+        const url = URL.createObjectURL(zipBlob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `converted_files_${Date.now()}.zip`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        toast({
+          title: "Conversion complete!",
+          description: `${selectedFiles.length} files converted and downloaded as ZIP`,
+        });
+      } else {
+        // Single file download
+        const url = URL.createObjectURL(convertedFiles[0].data);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = convertedFiles[0].name;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        toast({
+          title: "Conversion complete!",
+          description: `File converted to ${outputFormat}`,
+        });
+      }
     } catch (error) {
       toast({
         title: "Conversion failed",
@@ -106,15 +148,15 @@ const Index = () => {
           <div className="max-w-3xl mx-auto space-y-6 animate-slide-up" style={{ animationDelay: "0.1s" }}>
             {/* File Upload */}
             <div>
-              <h3 className="text-lg font-semibold mb-3">Upload File</h3>
+              <h3 className="text-lg font-semibold mb-3">Upload Files</h3>
               <FileUploader
-                onFileSelect={handleFileSelect}
+                onFilesSelect={handleFilesSelect}
                 acceptedTypes={acceptedTypesByCategory[selectedCategory]}
               />
             </div>
 
             {/* Format Selection */}
-            {selectedFile && (
+            {selectedFiles.length > 0 && (
               <div className="animate-scale-in">
                 <FormatSelector
                   category={selectedCategory}
@@ -125,32 +167,35 @@ const Index = () => {
             )}
 
             {/* Convert Button */}
-            {selectedFile && (
-              <div className="flex gap-3 animate-scale-in">
-                <Button
-                  onClick={handleConvert}
-                  disabled={isConverting}
-                  className="flex-1 h-12 text-lg font-semibold bg-gradient-primary hover:opacity-90 transition-opacity shadow-glow"
-                >
-                  {isConverting ? (
-                    <>
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                      Converting...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-5 h-5 mr-2" />
-                      Convert File
-                    </>
-                  )}
-                </Button>
-                <Button
-                  variant="outline"
-                  className="h-12 px-6"
-                  disabled={isConverting}
-                >
-                  <Download className="w-5 h-5" />
-                </Button>
+            {selectedFiles.length > 0 && (
+              <div className="animate-scale-in space-y-3">
+                {selectedFiles.length > 1 && (
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-accent/10 border border-accent/20">
+                    <Package className="w-4 h-4 text-accent" />
+                    <p className="text-sm font-medium text-accent">
+                      Multiple files will be downloaded as a ZIP archive
+                    </p>
+                  </div>
+                )}
+                <div className="flex gap-3">
+                  <Button
+                    onClick={handleConvert}
+                    disabled={isConverting}
+                    className="flex-1 h-12 text-lg font-semibold bg-gradient-primary hover:opacity-90 transition-opacity shadow-glow"
+                  >
+                    {isConverting ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                        Converting {selectedFiles.length} file{selectedFiles.length > 1 ? 's' : ''}...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-5 h-5 mr-2" />
+                        Convert & Download
+                      </>
+                    )}
+                  </Button>
+                </div>
               </div>
             )}
           </div>
