@@ -1,13 +1,20 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { FileCategory, CategorySelector } from "@/components/CategorySelector";
 import { FileUploader } from "@/components/FileUploader";
 import { FormatSelector } from "@/components/FormatSelector";
 import { Button } from "@/components/ui/button";
 import { Navbar } from "@/components/Navbar";
-import { Download, Sparkles, Package, FileText, QrCode } from "lucide-react";
+import { Download, Sparkles, Package, FileText, QrCode, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import JSZip from "jszip";
 import jsPDF from "jspdf";
 import QRCode from "qrcode";
@@ -19,6 +26,8 @@ const Index = () => {
   const [isConverting, setIsConverting] = useState(false);
   const [pdfImageMode, setPdfImageMode] = useState<"fit" | "stretch">("fit");
   const [downloadUrl, setDownloadUrl] = useState<string>("");
+  const [qrCodeUrl, setQrCodeUrl] = useState<string>("");
+  const [showQrDialog, setShowQrDialog] = useState(false);
   const { toast } = useToast();
 
   const acceptedTypesByCategory: Record<FileCategory, Record<string, string[]>> = {
@@ -114,7 +123,7 @@ const Index = () => {
   const generateQRCode = async (url: string): Promise<string> => {
     try {
       return await QRCode.toDataURL(url, {
-        width: 300,
+        width: 512,
         margin: 2,
         color: {
           dark: '#000000',
@@ -127,30 +136,20 @@ const Index = () => {
     }
   };
 
-  const downloadQRCode = async () => {
-    if (!downloadUrl) return;
-    
-    try {
-      const qrCodeDataUrl = await generateQRCode(downloadUrl);
-      const link = document.createElement("a");
-      link.href = qrCodeDataUrl;
-      link.download = `qr_code_${Date.now()}.png`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      toast({
-        title: "QR Code downloaded!",
-        description: "Scan it to download your converted file",
-      });
-    } catch (error) {
-      toast({
-        title: "QR Code generation failed",
-        description: "Could not generate QR code",
-        variant: "destructive",
-      });
-    }
-  };
+  useEffect(() => {
+    const generateQR = async () => {
+      if (downloadUrl) {
+        try {
+          const qrUrl = await generateQRCode(downloadUrl);
+          setQrCodeUrl(qrUrl);
+          setShowQrDialog(true);
+        } catch (error) {
+          console.error('Failed to generate QR code:', error);
+        }
+      }
+    };
+    generateQR();
+  }, [downloadUrl]);
 
   const handleConvert = async () => {
     if (selectedFiles.length === 0) {
@@ -360,10 +359,10 @@ const Index = () => {
                   
                   {downloadUrl && (
                     <Button
-                      onClick={downloadQRCode}
+                      onClick={() => setShowQrDialog(true)}
                       variant="outline"
                       className="h-12"
-                      title="Download QR Code"
+                      title="Show QR Code"
                     >
                       <QrCode className="w-5 h-5" />
                     </Button>
@@ -407,6 +406,57 @@ const Index = () => {
           </div>
         </div>
       </div>
+
+      {/* QR Code Dialog */}
+      <Dialog open={showQrDialog} onOpenChange={setShowQrDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-center">Scan QR Code to Download</DialogTitle>
+            <DialogDescription className="text-center">
+              Scan this QR code with your mobile device to download the converted file{selectedFiles.length > 1 ? 's' : ''}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col items-center gap-4 py-4">
+            {qrCodeUrl && (
+              <div className="bg-white p-4 rounded-lg">
+                <img 
+                  src={qrCodeUrl} 
+                  alt="QR Code for download" 
+                  className="w-full h-full max-w-[400px]"
+                />
+              </div>
+            )}
+            <div className="flex gap-2 w-full">
+              <Button
+                onClick={() => {
+                  const link = document.createElement("a");
+                  link.href = qrCodeUrl;
+                  link.download = `qr_code_${Date.now()}.png`;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                  toast({
+                    title: "QR Code downloaded!",
+                    description: "Save and share the QR code",
+                  });
+                }}
+                variant="outline"
+                className="flex-1"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Save QR Code
+              </Button>
+              <Button
+                onClick={() => setShowQrDialog(false)}
+                variant="default"
+                className="flex-1"
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
