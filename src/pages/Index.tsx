@@ -3,16 +3,22 @@ import { FileCategory, CategorySelector } from "@/components/CategorySelector";
 import { FileUploader } from "@/components/FileUploader";
 import { FormatSelector } from "@/components/FormatSelector";
 import { Button } from "@/components/ui/button";
-import { Download, Sparkles, Package, FileText } from "lucide-react";
+import { Navbar } from "@/components/Navbar";
+import { Download, Sparkles, Package, FileText, QrCode } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 import JSZip from "jszip";
 import jsPDF from "jspdf";
+import QRCode from "qrcode";
 
 const Index = () => {
   const [selectedCategory, setSelectedCategory] = useState<FileCategory>("image");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [outputFormat, setOutputFormat] = useState("PNG");
   const [isConverting, setIsConverting] = useState(false);
+  const [pdfImageMode, setPdfImageMode] = useState<"fit" | "stretch">("fit");
+  const [downloadUrl, setDownloadUrl] = useState<string>("");
   const { toast } = useToast();
 
   const acceptedTypesByCategory: Record<FileCategory, Record<string, string[]>> = {
@@ -45,7 +51,7 @@ const Index = () => {
     setSelectedFiles(files);
   };
 
-  const convertImagesToPDF = async (images: File[]): Promise<Blob> => {
+  const convertImagesToPDF = async (images: File[], mode: "fit" | "stretch"): Promise<Blob> => {
     const pdf = new jsPDF();
     let isFirstPage = true;
 
@@ -67,20 +73,31 @@ const Index = () => {
 
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-      const imgRatio = img.width / img.height;
-      const pageRatio = pageWidth / pageHeight;
+      
+      let finalWidth, finalHeight, x, y;
 
-      let finalWidth, finalHeight;
-      if (imgRatio > pageRatio) {
-        finalWidth = pageWidth - 20;
-        finalHeight = finalWidth / imgRatio;
+      if (mode === "stretch") {
+        // Stretch to fill entire page
+        finalWidth = pageWidth;
+        finalHeight = pageHeight;
+        x = 0;
+        y = 0;
       } else {
-        finalHeight = pageHeight - 20;
-        finalWidth = finalHeight * imgRatio;
-      }
+        // Fit to page with margins
+        const imgRatio = img.width / img.height;
+        const pageRatio = pageWidth / pageHeight;
 
-      const x = (pageWidth - finalWidth) / 2;
-      const y = (pageHeight - finalHeight) / 2;
+        if (imgRatio > pageRatio) {
+          finalWidth = pageWidth - 20;
+          finalHeight = finalWidth / imgRatio;
+        } else {
+          finalHeight = pageHeight - 20;
+          finalWidth = finalHeight * imgRatio;
+        }
+
+        x = (pageWidth - finalWidth) / 2;
+        y = (pageHeight - finalHeight) / 2;
+      }
 
       const imgData = await new Promise<string>((resolve) => {
         const reader = new FileReader();
@@ -92,6 +109,47 @@ const Index = () => {
     }
 
     return pdf.output('blob');
+  };
+
+  const generateQRCode = async (url: string): Promise<string> => {
+    try {
+      return await QRCode.toDataURL(url, {
+        width: 300,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#ffffff'
+        }
+      });
+    } catch (err) {
+      console.error('Error generating QR code:', err);
+      throw err;
+    }
+  };
+
+  const downloadQRCode = async () => {
+    if (!downloadUrl) return;
+    
+    try {
+      const qrCodeDataUrl = await generateQRCode(downloadUrl);
+      const link = document.createElement("a");
+      link.href = qrCodeDataUrl;
+      link.download = `qr_code_${Date.now()}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast({
+        title: "QR Code downloaded!",
+        description: "Scan it to download your converted file",
+      });
+    } catch (error) {
+      toast({
+        title: "QR Code generation failed",
+        description: "Could not generate QR code",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleConvert = async () => {
@@ -111,15 +169,16 @@ const Index = () => {
       if (selectedCategory === "image" && outputFormat === "PDF") {
         await new Promise((resolve) => setTimeout(resolve, 1500));
         
-        const pdfBlob = await convertImagesToPDF(selectedFiles);
+        const pdfBlob = await convertImagesToPDF(selectedFiles, pdfImageMode);
         const url = URL.createObjectURL(pdfBlob);
+        setDownloadUrl(url);
+        
         const link = document.createElement("a");
         link.href = url;
         link.download = `converted_images_${Date.now()}.pdf`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        URL.revokeObjectURL(url);
 
         toast({
           title: "Conversion complete!",
@@ -146,13 +205,14 @@ const Index = () => {
 
         const zipBlob = await zip.generateAsync({ type: "blob" });
         const url = URL.createObjectURL(zipBlob);
+        setDownloadUrl(url);
+        
         const link = document.createElement("a");
         link.href = url;
         link.download = `converted_files_${Date.now()}.zip`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        URL.revokeObjectURL(url);
 
         toast({
           title: "Conversion complete!",
@@ -161,13 +221,14 @@ const Index = () => {
       } else {
         // Single file download
         const url = URL.createObjectURL(convertedFiles[0].data);
+        setDownloadUrl(url);
+        
         const link = document.createElement("a");
         link.href = url;
         link.download = convertedFiles[0].name;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        URL.revokeObjectURL(url);
 
         toast({
           title: "Conversion complete!",
@@ -187,6 +248,8 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <Navbar />
+      
       {/* Hero Section */}
       <div className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-hero opacity-10"></div>
@@ -197,7 +260,7 @@ const Index = () => {
               <span className="text-sm font-medium">Fast & Secure</span>
             </div>
             <h1 className="text-5xl md:text-6xl font-bold mb-4 bg-gradient-hero bg-clip-text text-transparent">
-              Universal File Converter
+              Haryorofficial File Converter
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
               Convert images, videos, audio files, and documents instantly with our powerful
@@ -227,12 +290,33 @@ const Index = () => {
 
             {/* Format Selection */}
             {selectedFiles.length > 0 && (
-              <div className="animate-scale-in">
+              <div className="animate-scale-in space-y-4">
                 <FormatSelector
                   category={selectedCategory}
                   selectedFormat={outputFormat}
                   onFormatChange={setOutputFormat}
                 />
+                
+                {/* PDF Image Mode Selection */}
+                {selectedCategory === "image" && outputFormat === "PDF" && (
+                  <div className="p-4 rounded-lg border bg-card">
+                    <h4 className="font-semibold mb-3">PDF Layout Options</h4>
+                    <RadioGroup value={pdfImageMode} onValueChange={(value) => setPdfImageMode(value as "fit" | "stretch")}>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="fit" id="fit" />
+                        <Label htmlFor="fit" className="cursor-pointer">
+                          Fit to page (maintains aspect ratio with margins)
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="stretch" id="stretch" />
+                        <Label htmlFor="stretch" className="cursor-pointer">
+                          Stretch to fill (fills entire page)
+                        </Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+                )}
               </div>
             )}
 
@@ -273,6 +357,17 @@ const Index = () => {
                       </>
                     )}
                   </Button>
+                  
+                  {downloadUrl && (
+                    <Button
+                      onClick={downloadQRCode}
+                      variant="outline"
+                      className="h-12"
+                      title="Download QR Code"
+                    >
+                      <QrCode className="w-5 h-5" />
+                    </Button>
+                  )}
                 </div>
               </div>
             )}
