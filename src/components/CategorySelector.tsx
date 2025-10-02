@@ -1,7 +1,7 @@
-import { FileImage, FileVideo, FileAudio, FileText } from "lucide-react";
+import { FileImage, FileVideo, FileAudio, FileText, Minimize2 } from "lucide-react";
 import { Card } from "./ui/card";
 
-export type FileCategory = "image" | "video" | "audio" | "document";
+export type FileCategory = "image" | "video" | "audio" | "document" | "compress";
 
 interface CategorySelectorProps {
   selectedCategory: FileCategory;
@@ -33,6 +33,12 @@ const categories = [
     icon: FileText,
     gradient: "from-orange-500 to-red-500",
   },
+  {
+    id: "compress" as FileCategory,
+    name: "Compress",
+    icon: Minimize2,
+    gradient: "from-yellow-500 to-amber-500",
+  },
 ];
 
 export const CategorySelector = ({
@@ -40,7 +46,7 @@ export const CategorySelector = ({
   onCategoryChange,
 }: CategorySelectorProps) => {
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
       {categories.map((category) => {
         const Icon = category.icon;
         const isSelected = selectedCategory === category.id;

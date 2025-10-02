@@ -1,23 +1,16 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { FileCategory, CategorySelector } from "@/components/CategorySelector";
 import { FileUploader } from "@/components/FileUploader";
 import { FormatSelector } from "@/components/FormatSelector";
 import { Button } from "@/components/ui/button";
 import { Navbar } from "@/components/Navbar";
-import { Download, Sparkles, Package, FileText, QrCode, X } from "lucide-react";
+import { Sparkles, Package, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
+import { Slider } from "@/components/ui/slider";
 import JSZip from "jszip";
 import jsPDF from "jspdf";
-import QRCode from "qrcode";
 
 const Index = () => {
   const [selectedCategory, setSelectedCategory] = useState<FileCategory>("image");
@@ -25,9 +18,7 @@ const Index = () => {
   const [outputFormat, setOutputFormat] = useState("PNG");
   const [isConverting, setIsConverting] = useState(false);
   const [pdfImageMode, setPdfImageMode] = useState<"fit" | "stretch">("fit");
-  const [downloadUrl, setDownloadUrl] = useState<string>("");
-  const [qrCodeUrl, setQrCodeUrl] = useState<string>("");
-  const [showQrDialog, setShowQrDialog] = useState(false);
+  const [compressionQuality, setCompressionQuality] = useState(0.8);
   const { toast } = useToast();
 
   const acceptedTypesByCategory: Record<FileCategory, Record<string, string[]>> = {
@@ -41,6 +32,7 @@ const Index = () => {
       "application/vnd.oasis.opendocument.text": [".odt"],
       "application/epub+zip": [".epub"],
     },
+    compress: { "image/*": [".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff"] },
   };
 
   const handleCategoryChange = (category: FileCategory) => {
@@ -52,6 +44,7 @@ const Index = () => {
       video: "MP4",
       audio: "MP3",
       document: "PDF",
+      compress: "JPEG",
     };
     setOutputFormat(defaultFormats[category]);
   };
@@ -120,36 +113,39 @@ const Index = () => {
     return pdf.output('blob');
   };
 
-  const generateQRCode = async (url: string): Promise<string> => {
-    try {
-      return await QRCode.toDataURL(url, {
-        width: 512,
-        margin: 2,
-        color: {
-          dark: '#000000',
-          light: '#ffffff'
+  const compressImage = async (file: File, quality: number): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Could not get canvas context'));
+          return;
         }
-      });
-    } catch (err) {
-      console.error('Error generating QR code:', err);
-      throw err;
-    }
+        
+        ctx.drawImage(img, 0, 0);
+        
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              resolve(blob);
+            } else {
+              reject(new Error('Failed to compress image'));
+            }
+          },
+          'image/jpeg',
+          quality
+        );
+      };
+      
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = URL.createObjectURL(file);
+    });
   };
-
-  useEffect(() => {
-    const generateQR = async () => {
-      if (downloadUrl) {
-        try {
-          const qrUrl = await generateQRCode(downloadUrl);
-          setQrCodeUrl(qrUrl);
-          setShowQrDialog(true);
-        } catch (error) {
-          console.error('Failed to generate QR code:', error);
-        }
-      }
-    };
-    generateQR();
-  }, [downloadUrl]);
 
   const handleConvert = async () => {
     if (selectedFiles.length === 0) {
@@ -164,13 +160,57 @@ const Index = () => {
     setIsConverting(true);
 
     try {
+      // Special handling for image compression
+      if (selectedCategory === "compress") {
+        const compressedFiles: { name: string; data: Blob }[] = [];
+        
+        for (const file of selectedFiles) {
+          const compressedBlob = await compressImage(file, compressionQuality);
+          compressedFiles.push({
+            name: file.name.replace(/\.[^/.]+$/, `_compressed.jpg`),
+            data: compressedBlob,
+          });
+        }
+        
+        if (compressedFiles.length > 1) {
+          const zip = new JSZip();
+          compressedFiles.forEach((file) => {
+            zip.file(file.name, file.data);
+          });
+
+          const zipBlob = await zip.generateAsync({ type: "blob" });
+          const url = URL.createObjectURL(zipBlob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = `compressed_images_${Date.now()}.zip`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+        } else {
+          const url = URL.createObjectURL(compressedFiles[0].data);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = compressedFiles[0].name;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+        }
+
+        toast({
+          title: "Compression complete!",
+          description: `${selectedFiles.length} image${selectedFiles.length > 1 ? 's' : ''} compressed successfully`,
+        });
+        return;
+      }
+      
       // Special handling for image to PDF conversion
       if (selectedCategory === "image" && outputFormat === "PDF") {
         await new Promise((resolve) => setTimeout(resolve, 1500));
         
         const pdfBlob = await convertImagesToPDF(selectedFiles, pdfImageMode);
         const url = URL.createObjectURL(pdfBlob);
-        setDownloadUrl(url);
         
         const link = document.createElement("a");
         link.href = url;
@@ -178,6 +218,7 @@ const Index = () => {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        URL.revokeObjectURL(url);
 
         toast({
           title: "Conversion complete!",
@@ -204,7 +245,6 @@ const Index = () => {
 
         const zipBlob = await zip.generateAsync({ type: "blob" });
         const url = URL.createObjectURL(zipBlob);
-        setDownloadUrl(url);
         
         const link = document.createElement("a");
         link.href = url;
@@ -212,6 +252,7 @@ const Index = () => {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        URL.revokeObjectURL(url);
 
         toast({
           title: "Conversion complete!",
@@ -220,7 +261,6 @@ const Index = () => {
       } else {
         // Single file download
         const url = URL.createObjectURL(convertedFiles[0].data);
-        setDownloadUrl(url);
         
         const link = document.createElement("a");
         link.href = url;
@@ -228,6 +268,7 @@ const Index = () => {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        URL.revokeObjectURL(url);
 
         toast({
           title: "Conversion complete!",
@@ -288,7 +329,7 @@ const Index = () => {
             </div>
 
             {/* Format Selection */}
-            {selectedFiles.length > 0 && (
+            {selectedFiles.length > 0 && selectedCategory !== "compress" && (
               <div className="animate-scale-in space-y-4">
                 <FormatSelector
                   category={selectedCategory}
@@ -316,6 +357,40 @@ const Index = () => {
                     </RadioGroup>
                   </div>
                 )}
+              </div>
+            )}
+            
+            {/* Compression Quality Selection */}
+            {selectedFiles.length > 0 && selectedCategory === "compress" && (
+              <div className="animate-scale-in">
+                <div className="p-4 rounded-lg border bg-card space-y-4">
+                  <div>
+                    <h4 className="font-semibold mb-2">Compression Quality</h4>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Adjust the slider to control compression intensity (lower = smaller file size, higher = better quality)
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Quality: {Math.round(compressionQuality * 100)}%</span>
+                      <span className="text-muted-foreground">
+                        {compressionQuality < 0.5 ? "Maximum Compression" : compressionQuality < 0.7 ? "Balanced" : "High Quality"}
+                      </span>
+                    </div>
+                    <Slider
+                      value={[compressionQuality]}
+                      onValueChange={(value) => setCompressionQuality(value[0])}
+                      min={0.1}
+                      max={1}
+                      step={0.05}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Smaller</span>
+                      <span>Better Quality</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -347,26 +422,15 @@ const Index = () => {
                     {isConverting ? (
                       <>
                         <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                        Converting {selectedFiles.length} file{selectedFiles.length > 1 ? 's' : ''}...
+                        {selectedCategory === "compress" ? "Compressing" : "Converting"} {selectedFiles.length} file{selectedFiles.length > 1 ? 's' : ''}...
                       </>
                     ) : (
                       <>
                         <Sparkles className="w-5 h-5 mr-2" />
-                        Convert & Download
+                        {selectedCategory === "compress" ? "Compress & Download" : "Convert & Download"}
                       </>
                     )}
                   </Button>
-                  
-                  {downloadUrl && (
-                    <Button
-                      onClick={() => setShowQrDialog(true)}
-                      variant="outline"
-                      className="h-12"
-                      title="Show QR Code"
-                    >
-                      <QrCode className="w-5 h-5" />
-                    </Button>
-                  )}
                 </div>
               </div>
             )}
@@ -406,57 +470,6 @@ const Index = () => {
           </div>
         </div>
       </div>
-
-      {/* QR Code Dialog */}
-      <Dialog open={showQrDialog} onOpenChange={setShowQrDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-center">Scan QR Code to Download</DialogTitle>
-            <DialogDescription className="text-center">
-              Scan this QR code with your mobile device to download the converted file{selectedFiles.length > 1 ? 's' : ''}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-col items-center gap-4 py-4">
-            {qrCodeUrl && (
-              <div className="bg-white p-4 rounded-lg">
-                <img 
-                  src={qrCodeUrl} 
-                  alt="QR Code for download" 
-                  className="w-full h-full max-w-[400px]"
-                />
-              </div>
-            )}
-            <div className="flex gap-2 w-full">
-              <Button
-                onClick={() => {
-                  const link = document.createElement("a");
-                  link.href = qrCodeUrl;
-                  link.download = `qr_code_${Date.now()}.png`;
-                  document.body.appendChild(link);
-                  link.click();
-                  document.body.removeChild(link);
-                  toast({
-                    title: "QR Code downloaded!",
-                    description: "Save and share the QR code",
-                  });
-                }}
-                variant="outline"
-                className="flex-1"
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Save QR Code
-              </Button>
-              <Button
-                onClick={() => setShowQrDialog(false)}
-                variant="default"
-                className="flex-1"
-              >
-                Close
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

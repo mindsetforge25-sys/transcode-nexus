@@ -14,6 +14,7 @@ const formatsByCategory: Record<FileCategory, string[]> = {
   video: ["MP4", "AVI", "MOV", "MKV", "WEBM", "FLV", "WMV", "M4V", "3GP"],
   audio: ["MP3", "WAV", "OGG", "AAC", "FLAC", "M4A", "WMA", "AIFF"],
   document: ["PDF", "DOCX", "DOC", "TXT", "MD", "HTML", "RTF", "ODT", "EPUB"],
+  compress: ["JPEG"],
 };
 
 export const FormatSelector = ({
