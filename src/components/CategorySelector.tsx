@@ -1,7 +1,7 @@
-import { FileImage, FileVideo, FileAudio, FileText, Minimize2 } from "lucide-react";
+import { FileImage, FileVideo, FileAudio, FileText, Minimize2, Merge, Split, Droplet, Wand2 } from "lucide-react";
 import { Card } from "./ui/card";
 
-export type FileCategory = "image" | "video" | "audio" | "document" | "compress";
+export type FileCategory = "image" | "video" | "audio" | "document" | "compress" | "merge" | "split" | "watermark" | "background-removal";
 
 interface CategorySelectorProps {
   selectedCategory: FileCategory;
@@ -39,6 +39,30 @@ const categories = [
     icon: Minimize2,
     gradient: "from-yellow-500 to-amber-500",
   },
+  {
+    id: "merge" as FileCategory,
+    name: "Merge",
+    icon: Merge,
+    gradient: "from-indigo-500 to-purple-500",
+  },
+  {
+    id: "split" as FileCategory,
+    name: "Split",
+    icon: Split,
+    gradient: "from-pink-500 to-rose-500",
+  },
+  {
+    id: "watermark" as FileCategory,
+    name: "Watermark",
+    icon: Droplet,
+    gradient: "from-teal-500 to-cyan-500",
+  },
+  {
+    id: "background-removal" as FileCategory,
+    name: "Remove BG",
+    icon: Wand2,
+    gradient: "from-violet-500 to-fuchsia-500",
+  },
 ];
 
 export const CategorySelector = ({
@@ -46,7 +70,7 @@ export const CategorySelector = ({
   onCategoryChange,
 }: CategorySelectorProps) => {
   return (
-    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
       {categories.map((category) => {
         const Icon = category.icon;
         const isSelected = selectedCategory === category.id;

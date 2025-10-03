@@ -15,6 +15,10 @@ const formatsByCategory: Record<FileCategory, string[]> = {
   audio: ["MP3", "WAV", "OGG", "AAC", "FLAC", "M4A", "WMA", "AIFF"],
   document: ["PDF", "DOCX", "DOC", "TXT", "MD", "HTML", "RTF", "ODT", "EPUB"],
   compress: ["JPEG", "PDF"],
+  merge: ["PDF"],
+  split: ["PDF"],
+  watermark: ["PNG", "JPG", "PDF"],
+  "background-removal": ["PNG"],
 };
 
 export const FormatSelector = ({
