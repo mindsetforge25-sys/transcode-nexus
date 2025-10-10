@@ -27,16 +27,19 @@ import {
 
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
+import "./PDFEditor.css";
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
-interface TextAnnotation {
+interface TextEdit {
   id: string;
-  text: string;
+  originalText: string;
+  newText: string;
   x: number;
   y: number;
+  width: number;
+  height: number;
   fontSize: number;
-  color: string;
   pageNumber: number;
 }
 
@@ -60,14 +63,10 @@ const PDFEditor = () => {
   const [scale, setScale] = useState<number>(1.0);
   const [rotation, setRotation] = useState<number>(0);
   
-  const [activeTool, setActiveTool] = useState<"text" | "rectangle" | "circle" | "select">("select");
-  const [textAnnotations, setTextAnnotations] = useState<TextAnnotation[]>([]);
-  const [shapeAnnotations, setShapeAnnotations] = useState<ShapeAnnotation[]>([]);
+  const [textEdits, setTextEdits] = useState<TextEdit[]>([]);
+  const [selectedTextEdit, setSelectedTextEdit] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState<string>("");
   
-  const [newText, setNewText] = useState<string>("Sample Text");
-  const [fontSize, setFontSize] = useState<number>(16);
-  const [textColor, setTextColor] = useState<string>("#000000");
-  const [shapeColor, setShapeColor] = useState<string>("#FF0000");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -91,48 +90,54 @@ const PDFEditor = () => {
     }
   };
 
-  const handlePageClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (activeTool === "select") return;
+  const handleTextClick = (e: React.MouseEvent<HTMLSpanElement>) => {
+    e.stopPropagation();
+    const target = e.currentTarget;
+    const rect = target.getBoundingClientRect();
+    const parentRect = target.closest('.react-pdf__Page')?.getBoundingClientRect();
+    
+    if (!parentRect) return;
 
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / scale;
-    const y = (e.clientY - rect.top) / scale;
+    const originalText = target.textContent || "";
+    const computedStyle = window.getComputedStyle(target);
+    const fontSize = parseFloat(computedStyle.fontSize) / scale;
 
-    if (activeTool === "text") {
-      const newAnnotation: TextAnnotation = {
-        id: Date.now().toString(),
-        text: newText,
-        x,
-        y,
-        fontSize,
-        color: textColor,
-        pageNumber: currentPage,
-      };
-      setTextAnnotations([...textAnnotations, newAnnotation]);
-      toast.success("Text added to PDF");
-    } else if (activeTool === "rectangle" || activeTool === "circle") {
-      const newShape: ShapeAnnotation = {
-        id: Date.now().toString(),
-        type: activeTool,
-        x,
-        y,
-        width: 100,
-        height: 60,
-        color: shapeColor,
-        pageNumber: currentPage,
-      };
-      setShapeAnnotations([...shapeAnnotations, newShape]);
-      toast.success(`${activeTool} added to PDF`);
-    }
+    const newEdit: TextEdit = {
+      id: Date.now().toString(),
+      originalText,
+      newText: originalText,
+      x: (rect.left - parentRect.left) / scale,
+      y: (rect.top - parentRect.top) / scale,
+      width: rect.width / scale,
+      height: rect.height / scale,
+      fontSize,
+      pageNumber: currentPage,
+    };
+
+    setTextEdits([...textEdits, newEdit]);
+    setSelectedTextEdit(newEdit.id);
+    setEditingText(originalText);
+    toast.success("Text selected for editing");
   };
 
-  const handleDeleteAnnotation = (id: string, type: "text" | "shape") => {
-    if (type === "text") {
-      setTextAnnotations(textAnnotations.filter((a) => a.id !== id));
-    } else {
-      setShapeAnnotations(shapeAnnotations.filter((a) => a.id !== id));
+  const handleUpdateText = () => {
+    if (!selectedTextEdit) return;
+
+    setTextEdits(textEdits.map(edit => 
+      edit.id === selectedTextEdit 
+        ? { ...edit, newText: editingText }
+        : edit
+    ));
+    toast.success("Text updated");
+  };
+
+  const handleDeleteEdit = (id: string) => {
+    setTextEdits(textEdits.filter((e) => e.id !== id));
+    if (selectedTextEdit === id) {
+      setSelectedTextEdit(null);
+      setEditingText("");
     }
-    toast.success("Annotation deleted");
+    toast.success("Edit removed");
   };
 
   const handleSavePDF = async () => {
@@ -146,54 +151,28 @@ const PDFEditor = () => {
       const pdfDoc = await PDFDocument.load(existingPdfBytes);
       const pages = pdfDoc.getPages();
 
-      // Add text annotations
-      textAnnotations.forEach((annotation) => {
-        const page = pages[annotation.pageNumber - 1];
-        if (page) {
+      // Apply text edits
+      textEdits.forEach((edit) => {
+        const page = pages[edit.pageNumber - 1];
+        if (page && edit.originalText !== edit.newText) {
           const { height } = page.getSize();
-          page.drawText(annotation.text, {
-            x: annotation.x,
-            y: height - annotation.y,
-            size: annotation.fontSize,
-            color: rgb(
-              parseInt(annotation.color.slice(1, 3), 16) / 255,
-              parseInt(annotation.color.slice(3, 5), 16) / 255,
-              parseInt(annotation.color.slice(5, 7), 16) / 255
-            ),
+          
+          // Cover original text with white rectangle
+          page.drawRectangle({
+            x: edit.x,
+            y: height - edit.y - edit.height,
+            width: edit.width,
+            height: edit.height,
+            color: rgb(1, 1, 1),
           });
-        }
-      });
 
-      // Add shape annotations
-      shapeAnnotations.forEach((annotation) => {
-        const page = pages[annotation.pageNumber - 1];
-        if (page) {
-          const { height } = page.getSize();
-          const color = rgb(
-            parseInt(annotation.color.slice(1, 3), 16) / 255,
-            parseInt(annotation.color.slice(3, 5), 16) / 255,
-            parseInt(annotation.color.slice(5, 7), 16) / 255
-          );
-
-          if (annotation.type === "rectangle") {
-            page.drawRectangle({
-              x: annotation.x,
-              y: height - annotation.y - annotation.height,
-              width: annotation.width,
-              height: annotation.height,
-              borderColor: color,
-              borderWidth: 2,
-            });
-          } else if (annotation.type === "circle") {
-            page.drawEllipse({
-              x: annotation.x + annotation.width / 2,
-              y: height - annotation.y - annotation.height / 2,
-              xScale: annotation.width / 2,
-              yScale: annotation.height / 2,
-              borderColor: color,
-              borderWidth: 2,
-            });
-          }
+          // Draw new text
+          page.drawText(edit.newText, {
+            x: edit.x,
+            y: height - edit.y - edit.height + 2,
+            size: edit.fontSize,
+            color: rgb(0, 0, 0),
+          });
         }
       });
 
@@ -214,7 +193,24 @@ const PDFEditor = () => {
 
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
+    toast.success("PDF loaded - click on any text to edit it");
   };
+
+  useEffect(() => {
+    // Add click handlers to text layer after PDF loads
+    const addTextClickHandlers = () => {
+      const textLayer = document.querySelector('.react-pdf__Page__textContent');
+      if (textLayer) {
+        const textSpans = textLayer.querySelectorAll('span');
+        textSpans.forEach((span) => {
+          span.addEventListener('click', handleTextClick as any);
+        });
+      }
+    };
+
+    const timer = setTimeout(addTextClickHandlers, 500);
+    return () => clearTimeout(timer);
+  }, [currentPage, pdfUrl, scale]);
 
   return (
     <div className="flex h-screen w-full bg-background">
@@ -230,9 +226,10 @@ const PDFEditor = () => {
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Home
           </Button>
-          <h2 className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-            PDF Editor
+            <h2 className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
+            PDF Text Editor
           </h2>
+          <p className="text-sm text-muted-foreground mt-1">Click on any text to edit it</p>
         </div>
 
         <ScrollArea className="flex-1">
@@ -259,138 +256,70 @@ const PDFEditor = () => {
 
             <Separator />
 
-            {/* Tools */}
-            <div className="space-y-2">
-              <Label>Tools</Label>
-              <div className="grid grid-cols-2 gap-2">
+            {/* Edit Selected Text */}
+            {selectedTextEdit && (
+              <div className="space-y-4">
+                <Label>Edit Selected Text</Label>
+                <Textarea
+                  value={editingText}
+                  onChange={(e) => setEditingText(e.target.value)}
+                  placeholder="Enter new text..."
+                  rows={4}
+                />
                 <Button
-                  variant={activeTool === "text" ? "default" : "outline"}
-                  onClick={() => setActiveTool("text")}
+                  onClick={handleUpdateText}
                   className="w-full"
+                  size="sm"
                 >
-                  <Type className="mr-2 h-4 w-4" />
-                  Text
-                </Button>
-                <Button
-                  variant={activeTool === "rectangle" ? "default" : "outline"}
-                  onClick={() => setActiveTool("rectangle")}
-                  className="w-full"
-                >
-                  <Square className="mr-2 h-4 w-4" />
-                  Rectangle
-                </Button>
-                <Button
-                  variant={activeTool === "circle" ? "default" : "outline"}
-                  onClick={() => setActiveTool("circle")}
-                  className="w-full"
-                >
-                  <Circle className="mr-2 h-4 w-4" />
-                  Circle
-                </Button>
-                <Button
-                  variant={activeTool === "select" ? "default" : "outline"}
-                  onClick={() => setActiveTool("select")}
-                  className="w-full"
-                >
-                  Select
+                  <Save className="mr-2 h-4 w-4" />
+                  Update Text
                 </Button>
               </div>
-            </div>
-
-            {/* Text Settings */}
-            {activeTool === "text" && (
-              <>
-                <Separator />
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Text Content</Label>
-                    <Textarea
-                      value={newText}
-                      onChange={(e) => setNewText(e.target.value)}
-                      placeholder="Enter text..."
-                      rows={3}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Font Size: {fontSize}px</Label>
-                    <Slider
-                      value={[fontSize]}
-                      onValueChange={(value) => setFontSize(value[0])}
-                      min={8}
-                      max={72}
-                      step={1}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Text Color</Label>
-                    <Input
-                      type="color"
-                      value={textColor}
-                      onChange={(e) => setTextColor(e.target.value)}
-                      className="h-12"
-                    />
-                  </div>
-                </div>
-              </>
-            )}
-
-            {/* Shape Settings */}
-            {(activeTool === "rectangle" || activeTool === "circle") && (
-              <>
-                <Separator />
-                <div className="space-y-2">
-                  <Label>Shape Color</Label>
-                  <Input
-                    type="color"
-                    value={shapeColor}
-                    onChange={(e) => setShapeColor(e.target.value)}
-                    className="h-12"
-                  />
-                </div>
-              </>
             )}
 
             <Separator />
 
-            {/* Annotations List */}
+            {/* Text Edits List */}
             <div className="space-y-2">
-              <Label>Annotations ({textAnnotations.length + shapeAnnotations.length})</Label>
+              <Label>Text Edits ({textEdits.length})</Label>
+              {textEdits.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  Click on any text in the PDF to edit it
+                </p>
+              )}
               <div className="space-y-2">
-                {textAnnotations.map((annotation) => (
+                {textEdits.map((edit) => (
                   <div
-                    key={annotation.id}
-                    className="flex items-center justify-between p-2 border border-border rounded bg-muted/50"
+                    key={edit.id}
+                    className={`flex items-start justify-between p-2 border rounded cursor-pointer transition-colors ${
+                      selectedTextEdit === edit.id
+                        ? "border-primary bg-primary/10"
+                        : "border-border bg-muted/50 hover:bg-muted"
+                    }`}
+                    onClick={() => {
+                      setSelectedTextEdit(edit.id);
+                      setEditingText(edit.newText);
+                    }}
                   >
-                    <div className="flex items-center gap-2">
-                      <Type className="h-4 w-4" />
-                      <span className="text-sm truncate">{annotation.text}</span>
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Type className="h-4 w-4 flex-shrink-0" />
+                        <span className="text-xs text-muted-foreground">Original:</span>
+                      </div>
+                      <p className="text-sm line-through opacity-60 truncate">
+                        {edit.originalText}
+                      </p>
+                      <p className="text-sm font-medium truncate">
+                        {edit.newText}
+                      </p>
                     </div>
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleDeleteAnnotation(annotation.id, "text")}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-                {shapeAnnotations.map((annotation) => (
-                  <div
-                    key={annotation.id}
-                    className="flex items-center justify-between p-2 border border-border rounded bg-muted/50"
-                  >
-                    <div className="flex items-center gap-2">
-                      {annotation.type === "rectangle" ? (
-                        <Square className="h-4 w-4" />
-                      ) : (
-                        <Circle className="h-4 w-4" />
-                      )}
-                      <span className="text-sm capitalize">{annotation.type}</span>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDeleteAnnotation(annotation.id, "shape")}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteEdit(edit.id);
+                      }}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -478,11 +407,7 @@ const PDFEditor = () => {
         <ScrollArea className="flex-1">
           <div className="flex items-center justify-center p-8 min-h-full">
             {pdfUrl ? (
-              <div
-                className="relative border-2 border-border shadow-glow rounded bg-card"
-                onClick={handlePageClick}
-                style={{ cursor: activeTool === "select" ? "default" : "crosshair" }}
-              >
+              <div className="relative border-2 border-border shadow-glow rounded bg-card">
                 <Document
                   file={pdfUrl}
                   onLoadSuccess={onDocumentLoadSuccess}
@@ -494,42 +419,26 @@ const PDFEditor = () => {
                     rotate={rotation}
                     renderTextLayer={true}
                     renderAnnotationLayer={true}
+                    className="pdf-page-editable"
                   />
                 </Document>
 
-                {/* Overlay for annotations */}
-                {textAnnotations
-                  .filter((a) => a.pageNumber === currentPage)
-                  .map((annotation) => (
+                {/* Overlay for edited text highlights */}
+                {textEdits
+                  .filter((e) => e.pageNumber === currentPage)
+                  .map((edit) => (
                     <div
-                      key={annotation.id}
-                      className="absolute pointer-events-none"
+                      key={edit.id}
+                      className={`absolute border-2 pointer-events-none ${
+                        selectedTextEdit === edit.id
+                          ? "border-primary bg-primary/20"
+                          : "border-yellow-500 bg-yellow-500/10"
+                      }`}
                       style={{
-                        left: annotation.x * scale,
-                        top: annotation.y * scale,
-                        fontSize: annotation.fontSize * scale,
-                        color: annotation.color,
-                        whiteSpace: "pre-wrap",
-                        fontWeight: "500",
-                      }}
-                    >
-                      {annotation.text}
-                    </div>
-                  ))}
-
-                {shapeAnnotations
-                  .filter((a) => a.pageNumber === currentPage)
-                  .map((annotation) => (
-                    <div
-                      key={annotation.id}
-                      className="absolute pointer-events-none border-2"
-                      style={{
-                        left: annotation.x * scale,
-                        top: annotation.y * scale,
-                        width: annotation.width * scale,
-                        height: annotation.height * scale,
-                        borderColor: annotation.color,
-                        borderRadius: annotation.type === "circle" ? "50%" : "0",
+                        left: edit.x * scale,
+                        top: edit.y * scale,
+                        width: edit.width * scale,
+                        height: edit.height * scale,
                       }}
                     />
                   ))}

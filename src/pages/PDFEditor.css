@@ -1,0 +1,14 @@
+/* Make text layer clickable for editing */
+.pdf-page-editable .react-pdf__Page__textContent {
+  cursor: pointer !important;
+}
+
+.pdf-page-editable .react-pdf__Page__textContent span {
+  cursor: pointer !important;
+  transition: background-color 0.2s;
+}
+
+.pdf-page-editable .react-pdf__Page__textContent span:hover {
+  background-color: rgba(59, 130, 246, 0.1) !important;
+  outline: 1px solid rgba(59, 130, 246, 0.3);
+}
