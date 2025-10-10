@@ -190,7 +190,7 @@ const Index = () => {
       objectsPerTick: Math.floor(quality * 50),
     });
     
-    return new Blob([pdfBytes], { type: 'application/pdf' });
+    return new Blob([new Uint8Array(pdfBytes) as any], { type: 'application/pdf' });
   };
 
   const compressToTargetSize = async (file: File, targetSizeKB: number): Promise<Blob> => {
@@ -232,7 +232,7 @@ const Index = () => {
     }
     
     const pdfBytes = await mergedPdf.save();
-    return new Blob([pdfBytes], { type: 'application/pdf' });
+    return new Blob([new Uint8Array(pdfBytes) as any], { type: 'application/pdf' });
   };
 
   const mergeImages = async (files: File[]): Promise<Blob> => {
@@ -312,7 +312,7 @@ const Index = () => {
       const [copiedPage] = await newPdf.copyPages(pdfDoc, [pageIndex]);
       newPdf.addPage(copiedPage);
       const pdfBytes = await newPdf.save();
-      splitPdfs.push(new Blob([pdfBytes], { type: 'application/pdf' }));
+      splitPdfs.push(new Blob([new Uint8Array(pdfBytes) as any], { type: 'application/pdf' }));
     }
     
     return splitPdfs;
@@ -367,7 +367,7 @@ const Index = () => {
     }
     
     const pdfBytes = await pdfDoc.save();
-    return new Blob([pdfBytes], { type: 'application/pdf' });
+    return new Blob([new Uint8Array(pdfBytes) as any], { type: 'application/pdf' });
   };
 
   const removeBackground = async (file: File): Promise<Blob> => {
