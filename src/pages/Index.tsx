@@ -445,6 +445,102 @@ const Index = () => {
     });
   };
 
+  const encodeAudioBufferToWav = async (audioBuffer: AudioBuffer): Promise<Blob> => {
+    const numberOfChannels = audioBuffer.numberOfChannels;
+    const length = audioBuffer.length * numberOfChannels * 2;
+    const buffer = new ArrayBuffer(44 + length);
+    const view = new DataView(buffer);
+    const channels: Float32Array[] = [];
+    let offset = 0;
+    let pos = 0;
+
+    // Collect audio data from all channels
+    for (let i = 0; i < numberOfChannels; i++) {
+      channels.push(audioBuffer.getChannelData(i));
+    }
+
+    // Write WAV header
+    const writeString = (str: string) => {
+      for (let i = 0; i < str.length; i++) {
+        view.setUint8(pos++, str.charCodeAt(i));
+      }
+    };
+
+    writeString('RIFF');
+    view.setUint32(pos, 36 + length, true); pos += 4;
+    writeString('WAVE');
+    writeString('fmt ');
+    view.setUint32(pos, 16, true); pos += 4; // PCM format
+    view.setUint16(pos, 1, true); pos += 2; // PCM
+    view.setUint16(pos, numberOfChannels, true); pos += 2;
+    view.setUint32(pos, audioBuffer.sampleRate, true); pos += 4;
+    view.setUint32(pos, audioBuffer.sampleRate * numberOfChannels * 2, true); pos += 4;
+    view.setUint16(pos, numberOfChannels * 2, true); pos += 2;
+    view.setUint16(pos, 16, true); pos += 2;
+    writeString('data');
+    view.setUint32(pos, length, true); pos += 4;
+
+    // Write interleaved audio data
+    for (let i = 0; i < audioBuffer.length; i++) {
+      for (let channel = 0; channel < numberOfChannels; channel++) {
+        const sample = Math.max(-1, Math.min(1, channels[channel][i]));
+        view.setInt16(pos, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+        pos += 2;
+      }
+    }
+
+    return new Blob([buffer], { type: 'audio/wav' });
+  };
+
+  const encodeAudioWithMediaRecorder = async (audioBuffer: AudioBuffer, mimeType: string): Promise<Blob> => {
+    // Create an offline audio context to play the buffer
+    const offlineContext = new OfflineAudioContext(
+      audioBuffer.numberOfChannels,
+      audioBuffer.length,
+      audioBuffer.sampleRate
+    );
+    
+    const source = offlineContext.createBufferSource();
+    source.buffer = audioBuffer;
+    
+    const dest = offlineContext.destination;
+    source.connect(dest);
+    source.start();
+    
+    // Render the audio
+    const renderedBuffer = await offlineContext.startRendering();
+    
+    // Create a MediaStream from the rendered buffer
+    const mediaStreamDestination = new AudioContext().createMediaStreamDestination();
+    const newSource = new AudioContext().createBufferSource();
+    newSource.buffer = renderedBuffer;
+    newSource.connect(mediaStreamDestination);
+    
+    // Use MediaRecorder to encode to target format
+    return new Promise((resolve, reject) => {
+      const chunks: Blob[] = [];
+      const mediaRecorder = new MediaRecorder(mediaStreamDestination.stream, { mimeType });
+      
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunks.push(e.data);
+      };
+      
+      mediaRecorder.onstop = () => {
+        resolve(new Blob(chunks, { type: mimeType }));
+      };
+      
+      mediaRecorder.onerror = reject;
+      
+      mediaRecorder.start();
+      newSource.start();
+      
+      // Stop recording after buffer duration
+      setTimeout(() => {
+        mediaRecorder.stop();
+      }, (renderedBuffer.duration * 1000) + 100);
+    });
+  };
+
   const handleConvert = async () => {
     if (selectedFiles.length === 0) {
       toast({
@@ -687,7 +783,7 @@ const Index = () => {
         return;
       }
 
-      // Actual conversion logic for image formats
+      // Actual conversion logic for all formats
       const convertedFiles: { name: string; data: Blob }[] = [];
       
       for (const file of selectedFiles) {
@@ -739,8 +835,71 @@ const Index = () => {
               quality
             );
           });
+        } else if (selectedCategory === "audio") {
+          // Convert audio using Web Audio API
+          const arrayBuffer = await file.arrayBuffer();
+          const audioContext = new AudioContext();
+          const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+          
+          // Determine output format
+          let mimeType = 'audio/wav';
+          let channels = audioBuffer.numberOfChannels;
+          let sampleRate = audioBuffer.sampleRate;
+          
+          switch (outputFormat.toUpperCase()) {
+            case 'WAV':
+              mimeType = 'audio/wav';
+              break;
+            case 'MP3':
+              mimeType = 'audio/mpeg';
+              break;
+            case 'OGG':
+              mimeType = 'audio/ogg';
+              break;
+            case 'WEBM':
+              mimeType = 'audio/webm';
+              break;
+            default:
+              mimeType = 'audio/wav';
+          }
+          
+          // For WAV, we can directly encode the audio buffer
+          if (outputFormat.toUpperCase() === 'WAV') {
+            convertedBlob = await encodeAudioBufferToWav(audioBuffer);
+          } else {
+            // For other formats, we use MediaRecorder if supported
+            try {
+              convertedBlob = await encodeAudioWithMediaRecorder(audioBuffer, mimeType);
+            } catch (error) {
+              // Fallback to WAV if format not supported
+              toast({
+                title: "Format not fully supported",
+                description: `Converting to WAV instead. ${outputFormat} encoding not available.`,
+                variant: "destructive",
+              });
+              convertedBlob = await encodeAudioBufferToWav(audioBuffer);
+            }
+          }
+          
+          await audioContext.close();
+        } else if (selectedCategory === "video") {
+          // Video conversion requires FFmpeg.wasm - too complex for browser
+          toast({
+            title: "Video conversion not supported",
+            description: "Video format conversion requires specialized libraries. Please use desktop software.",
+            variant: "destructive",
+          });
+          throw new Error("Video conversion not supported in browser");
+        } else if (selectedCategory === "document") {
+          // Document conversion is complex and format-specific
+          toast({
+            title: "Document conversion limited",
+            description: "Full document conversion not supported. Please use specialized tools.",
+            variant: "destructive",
+          });
+          throw new Error("Document conversion not supported in browser");
         } else {
-          // For non-image formats, keep original (placeholder)
+          // For unsupported formats, keep original
           convertedBlob = file;
         }
         
