@@ -687,14 +687,68 @@ const Index = () => {
         return;
       }
 
-      // Placeholder for actual conversion logic for other formats
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      // Simulate converted files
-      const convertedFiles: { name: string; data: Blob }[] = selectedFiles.map((file) => ({
-        name: file.name.replace(/\.[^/.]+$/, `.${outputFormat.toLowerCase()}`),
-        data: new Blob([file], { type: file.type }),
-      }));
+      // Actual conversion logic for image formats
+      const convertedFiles: { name: string; data: Blob }[] = [];
+      
+      for (const file of selectedFiles) {
+        let convertedBlob: Blob;
+        
+        if (selectedCategory === "image") {
+          // Convert image to target format
+          const img = await loadImageFromFile(file);
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            throw new Error('Could not get canvas context');
+          }
+          
+          ctx.drawImage(img, 0, 0);
+          
+          // Determine output MIME type
+          let mimeType = 'image/png';
+          let quality = 0.95;
+          
+          switch (outputFormat.toUpperCase()) {
+            case 'JPG':
+            case 'JPEG':
+              mimeType = 'image/jpeg';
+              break;
+            case 'WEBP':
+              mimeType = 'image/webp';
+              break;
+            case 'PNG':
+              mimeType = 'image/png';
+              break;
+            case 'BMP':
+              mimeType = 'image/bmp';
+              break;
+            default:
+              mimeType = 'image/png';
+          }
+          
+          convertedBlob = await new Promise<Blob>((resolve, reject) => {
+            canvas.toBlob(
+              (blob) => {
+                if (blob) resolve(blob);
+                else reject(new Error('Failed to convert image'));
+              },
+              mimeType,
+              quality
+            );
+          });
+        } else {
+          // For non-image formats, keep original (placeholder)
+          convertedBlob = file;
+        }
+        
+        convertedFiles.push({
+          name: file.name.replace(/\.[^/.]+$/, `.${outputFormat.toLowerCase()}`),
+          data: convertedBlob,
+        });
+      }
 
       // If multiple files, create a zip
       if (convertedFiles.length > 1) {
