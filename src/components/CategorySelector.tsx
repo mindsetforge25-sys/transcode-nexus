@@ -13,55 +13,46 @@ const categories = [
     id: "image" as FileCategory,
     name: "Images",
     icon: FileImage,
-    gradient: "from-purple-500 to-pink-500",
   },
   {
     id: "video" as FileCategory,
     name: "Videos",
     icon: FileVideo,
-    gradient: "from-blue-500 to-cyan-500",
   },
   {
     id: "audio" as FileCategory,
     name: "Audio",
     icon: FileAudio,
-    gradient: "from-green-500 to-emerald-500",
   },
   {
     id: "document" as FileCategory,
     name: "Documents",
     icon: FileText,
-    gradient: "from-orange-500 to-red-500",
   },
   {
     id: "compress" as FileCategory,
     name: "Compress",
     icon: Minimize2,
-    gradient: "from-yellow-500 to-amber-500",
   },
   {
     id: "merge" as FileCategory,
     name: "Merge",
     icon: Merge,
-    gradient: "from-indigo-500 to-purple-500",
   },
   {
     id: "split" as FileCategory,
     name: "Split",
     icon: Split,
-    gradient: "from-pink-500 to-rose-500",
   },
   {
     id: "watermark" as FileCategory,
     name: "Watermark",
     icon: Droplet,
-    gradient: "from-teal-500 to-cyan-500",
   },
   {
     id: "background-removal" as FileCategory,
     name: "Remove BG",
     icon: Wand2,
-    gradient: "from-violet-500 to-fuchsia-500",
   },
 ];
 
@@ -70,7 +61,7 @@ export const CategorySelector = ({
   onCategoryChange,
 }: CategorySelectorProps) => {
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
       {categories.map((category) => {
         const Icon = category.icon;
         const isSelected = selectedCategory === category.id;
@@ -79,17 +70,19 @@ export const CategorySelector = ({
           <Card
             key={category.id}
             onClick={() => onCategoryChange(category.id)}
-            className={`p-6 cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-card ${
-              isSelected ? "ring-2 ring-primary shadow-glow" : ""
+            className={`p-5 cursor-pointer transition-all duration-200 border ${
+              isSelected 
+                ? "bg-primary text-primary-foreground border-primary shadow-elevated" 
+                : "bg-card hover:bg-accent/5 border-border hover:border-accent/40"
             }`}
           >
-            <div className="flex flex-col items-center gap-3 text-center">
-              <div
-                className={`w-14 h-14 rounded-xl bg-gradient-to-br ${category.gradient} flex items-center justify-center`}
-              >
-                <Icon className="w-7 h-7 text-white" />
+            <div className="flex flex-col items-center gap-2.5 text-center">
+              <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+                isSelected ? "bg-primary-foreground/10" : "bg-accent/10"
+              }`}>
+                <Icon className={`w-6 h-6 ${isSelected ? "text-primary-foreground" : "text-accent"}`} />
               </div>
-              <p className="font-semibold">{category.name}</p>
+              <p className="font-medium text-sm">{category.name}</p>
             </div>
           </Card>
         );

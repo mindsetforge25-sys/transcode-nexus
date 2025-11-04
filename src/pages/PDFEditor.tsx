@@ -216,27 +216,27 @@ const PDFEditor = () => {
     <div className="flex h-screen w-full bg-background">
       {/* Sidebar */}
       <aside className="w-80 border-r border-border bg-card overflow-hidden flex flex-col">
-        <div className="p-4 border-b border-border">
+        <div className="p-6 border-b border-border">
           <Button
             variant="ghost"
             size="sm"
             onClick={() => navigate("/")}
-            className="mb-4"
+            className="mb-4 -ml-2"
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Home
+            Back
           </Button>
-            <h2 className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
+          <h2 className="text-2xl font-bold text-foreground">
             PDF Text Editor
           </h2>
-          <p className="text-sm text-muted-foreground mt-1">Click on any text to edit it</p>
+          <p className="text-sm text-muted-foreground mt-2">Click any text to edit it</p>
         </div>
 
         <ScrollArea className="flex-1">
-          <div className="p-4 space-y-6">
+          <div className="p-6 space-y-6">
             {/* File Upload */}
-            <div className="space-y-2">
-              <Label>Upload PDF</Label>
+            <div className="space-y-3">
+              <Label className="text-sm font-semibold text-foreground">Upload PDF</Label>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -247,10 +247,10 @@ const PDFEditor = () => {
               <Button
                 onClick={() => fileInputRef.current?.click()}
                 variant="outline"
-                className="w-full"
+                className="w-full h-11 border-border"
               >
                 <Upload className="mr-2 h-4 w-4" />
-                Choose PDF File
+                Choose File
               </Button>
             </div>
 
@@ -258,13 +258,14 @@ const PDFEditor = () => {
 
             {/* Edit Selected Text */}
             {selectedTextEdit && (
-              <div className="space-y-4">
-                <Label>Edit Selected Text</Label>
+              <div className="space-y-3">
+                <Label className="text-sm font-semibold text-foreground">Edit Text</Label>
                 <Textarea
                   value={editingText}
                   onChange={(e) => setEditingText(e.target.value)}
                   placeholder="Enter new text..."
                   rows={4}
+                  className="resize-none"
                 />
                 <Button
                   onClick={handleUpdateText}
@@ -272,7 +273,7 @@ const PDFEditor = () => {
                   size="sm"
                 >
                   <Save className="mr-2 h-4 w-4" />
-                  Update Text
+                  Update
                 </Button>
               </div>
             )}
@@ -280,36 +281,36 @@ const PDFEditor = () => {
             <Separator />
 
             {/* Text Edits List */}
-            <div className="space-y-2">
-              <Label>Text Edits ({textEdits.length})</Label>
+            <div className="space-y-3">
+              <Label className="text-sm font-semibold text-foreground">Text Edits ({textEdits.length})</Label>
               {textEdits.length === 0 && (
                 <p className="text-sm text-muted-foreground">
-                  Click on any text in the PDF to edit it
+                  Click text in the PDF to edit it
                 </p>
               )}
               <div className="space-y-2">
                 {textEdits.map((edit) => (
                   <div
                     key={edit.id}
-                    className={`flex items-start justify-between p-2 border rounded cursor-pointer transition-colors ${
+                    className={`flex items-start justify-between p-3 border rounded-lg cursor-pointer transition-all ${
                       selectedTextEdit === edit.id
-                        ? "border-primary bg-primary/10"
-                        : "border-border bg-muted/50 hover:bg-muted"
+                        ? "border-accent bg-accent/5"
+                        : "border-border bg-secondary/50 hover:bg-secondary"
                     }`}
                     onClick={() => {
                       setSelectedTextEdit(edit.id);
                       setEditingText(edit.newText);
                     }}
                   >
-                    <div className="flex-1 min-w-0 space-y-1">
+                    <div className="flex-1 min-w-0 space-y-1.5">
                       <div className="flex items-center gap-2">
-                        <Type className="h-4 w-4 flex-shrink-0" />
-                        <span className="text-xs text-muted-foreground">Original:</span>
+                        <Type className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                        <span className="text-xs text-muted-foreground">Original</span>
                       </div>
                       <p className="text-sm line-through opacity-60 truncate">
                         {edit.originalText}
                       </p>
-                      <p className="text-sm font-medium truncate">
+                      <p className="text-sm font-medium truncate text-foreground">
                         {edit.newText}
                       </p>
                     </div>
@@ -320,6 +321,7 @@ const PDFEditor = () => {
                         e.stopPropagation();
                         handleDeleteEdit(edit.id);
                       }}
+                      className="h-8 w-8 p-0 hover:text-destructive"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -331,38 +333,40 @@ const PDFEditor = () => {
         </ScrollArea>
 
         {/* Save Button */}
-        <div className="p-4 border-t border-border">
+        <div className="p-6 border-t border-border">
           <Button
             onClick={handleSavePDF}
             disabled={!pdfFile}
-            className="w-full"
+            className="w-full h-12 bg-primary text-primary-foreground font-semibold"
             size="lg"
           >
-            <Download className="mr-2 h-4 w-4" />
-            Save & Download PDF
+            <Download className="mr-2 h-5 w-5" />
+            Save PDF
           </Button>
         </div>
       </aside>
 
       {/* Main Canvas */}
-      <main className="flex-1 flex flex-col bg-muted/20">
+      <main className="flex-1 flex flex-col bg-secondary/20">
         {/* Toolbar */}
-        <div className="h-16 border-b border-border bg-card flex items-center justify-between px-4">
-          <div className="flex items-center gap-2">
+        <div className="h-16 border-b border-border bg-card flex items-center justify-between px-6">
+          <div className="flex items-center gap-3">
             <Button
               variant="outline"
               size="icon"
               onClick={() => setScale(Math.max(0.5, scale - 0.1))}
+              className="h-9 w-9"
             >
               <ZoomOut className="h-4 w-4" />
             </Button>
-            <span className="text-sm font-medium w-16 text-center">
+            <span className="text-sm font-medium w-16 text-center text-foreground">
               {Math.round(scale * 100)}%
             </span>
             <Button
               variant="outline"
               size="icon"
               onClick={() => setScale(Math.min(2, scale + 0.1))}
+              className="h-9 w-9"
             >
               <ZoomIn className="h-4 w-4" />
             </Button>
@@ -371,6 +375,7 @@ const PDFEditor = () => {
               variant="outline"
               size="icon"
               onClick={() => setRotation((rotation + 90) % 360)}
+              className="h-9 w-9"
             >
               <RotateCw className="h-4 w-4" />
             </Button>
@@ -378,7 +383,7 @@ const PDFEditor = () => {
 
           {pdfFile && (
             <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 <Button
                   variant="outline"
                   size="sm"
@@ -387,7 +392,7 @@ const PDFEditor = () => {
                 >
                   Previous
                 </Button>
-                <span className="text-sm">
+                <span className="text-sm text-foreground font-medium">
                   Page {currentPage} of {numPages}
                 </span>
                 <Button
@@ -407,7 +412,7 @@ const PDFEditor = () => {
         <ScrollArea className="flex-1">
           <div className="flex items-center justify-center p-8 min-h-full">
             {pdfUrl ? (
-              <div className="relative border-2 border-border shadow-glow rounded bg-card">
+              <div className="relative border border-border shadow-elevated rounded-lg bg-card">
                 <Document
                   file={pdfUrl}
                   onLoadSuccess={onDocumentLoadSuccess}
@@ -431,8 +436,8 @@ const PDFEditor = () => {
                       key={edit.id}
                       className={`absolute border-2 pointer-events-none ${
                         selectedTextEdit === edit.id
-                          ? "border-primary bg-primary/20"
-                          : "border-yellow-500 bg-yellow-500/10"
+                          ? "border-accent bg-accent/10"
+                          : "border-accent/40 bg-accent/5"
                       }`}
                       style={{
                         left: edit.x * scale,
@@ -444,16 +449,19 @@ const PDFEditor = () => {
                   ))}
               </div>
             ) : (
-              <div className="text-center space-y-4">
-                <div className="w-24 h-24 mx-auto rounded-full bg-gradient-primary flex items-center justify-center">
-                  <Upload className="h-12 w-12 text-primary-foreground" />
+              <div className="text-center space-y-6 max-w-md">
+                <div className="w-20 h-20 mx-auto rounded-2xl bg-accent/10 flex items-center justify-center border-2 border-accent/20">
+                  <Upload className="h-10 w-10 text-accent" />
                 </div>
-                <div>
-                  <h3 className="text-xl font-semibold mb-2">No PDF Loaded</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Upload a PDF file to start editing
+                <div className="space-y-3">
+                  <h3 className="text-xl font-semibold text-foreground">No PDF Loaded</h3>
+                  <p className="text-muted-foreground">
+                    Upload a PDF file to start editing text
                   </p>
-                  <Button onClick={() => fileInputRef.current?.click()}>
+                  <Button 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="mt-4"
+                  >
                     <Upload className="mr-2 h-4 w-4" />
                     Upload PDF
                   </Button>

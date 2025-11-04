@@ -29,18 +29,18 @@ export const FormatSelector = ({
   const formats = formatsByCategory[category];
 
   return (
-    <Card className="p-6">
-      <h3 className="font-semibold mb-4">Convert to:</h3>
+    <Card className="p-6 border-border bg-card shadow-card">
+      <h3 className="font-semibold text-foreground mb-5">Output Format</h3>
       <RadioGroup value={selectedFormat} onValueChange={onFormatChange}>
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-6 gap-2.5">
           {formats.map((format) => (
-            <div key={format} className="flex items-center space-x-2">
-              <RadioGroupItem value={format} id={format} />
+            <div key={format} className="flex items-center">
               <Label
                 htmlFor={format}
-                className="cursor-pointer font-medium hover:text-primary transition-colors"
+                className="cursor-pointer flex items-center gap-2 px-3 py-2 rounded-md border border-border hover:border-accent hover:bg-accent/5 transition-all w-full has-[:checked]:bg-primary has-[:checked]:text-primary-foreground has-[:checked]:border-primary"
               >
-                {format}
+                <RadioGroupItem value={format} id={format} className="sr-only" />
+                <span className="text-sm font-medium">{format}</span>
               </Label>
             </div>
           ))}

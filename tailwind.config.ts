@@ -83,10 +83,6 @@ export default {
         "slide-up": {
           "0%": { transform: "translateY(20px)", opacity: "0" },
           "100%": { transform: "translateY(0)", opacity: "1" }
-        },
-        "glow": {
-          "0%, 100%": { filter: "brightness(1) drop-shadow(0 0 15px hsl(var(--primary) / 0.3))" },
-          "50%": { filter: "brightness(1.1) drop-shadow(0 0 25px hsl(var(--primary) / 0.5))" }
         }
       },
       animation: {
@@ -95,17 +91,10 @@ export default {
         "fade-in": "fade-in 0.5s ease-out",
         "scale-in": "scale-in 0.3s ease-out",
         "slide-up": "slide-up 0.6s ease-out",
-        "glow": "glow 2s ease-in-out infinite",
-      },
-      backgroundImage: {
-        "gradient-primary": "var(--gradient-primary)",
-        "gradient-accent": "var(--gradient-accent)",
-        "gradient-hero": "var(--gradient-hero)",
       },
       boxShadow: {
         "card": "var(--shadow-card)",
-        "glow": "var(--shadow-glow)",
-        "accent": "var(--shadow-accent)",
+        "elevated": "var(--shadow-elevated)",
       },
     },
   },

@@ -964,26 +964,24 @@ const Index = () => {
       <Navbar />
       
       {/* Hero Section */}
-      <div className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-hero opacity-10"></div>
-        <div className="container mx-auto px-4 py-16 relative">
-          <div className="text-center mb-12 animate-fade-in">
-            <div className="inline-flex items-center gap-2 mb-4 px-4 py-2 rounded-full bg-primary/10 text-primary">
-              <Sparkles className="w-4 h-4" />
-              <span className="text-sm font-medium">Fast & Secure</span>
+      <div className="relative">
+        <div className="container mx-auto px-6 py-20 relative">
+          <div className="text-center mb-16 animate-fade-in max-w-4xl mx-auto">
+            <div className="inline-flex items-center gap-2 mb-6 px-4 py-1.5 rounded-full border border-border bg-secondary/50">
+              <div className="w-2 h-2 rounded-full bg-accent animate-pulse" />
+              <span className="text-sm font-medium text-foreground">Fast & Secure Conversion</span>
             </div>
-            <h1 className="text-5xl md:text-6xl font-bold mb-4 bg-gradient-hero bg-clip-text text-transparent">
-              Haryorofficial File Converter
+            <h1 className="text-5xl md:text-7xl font-bold mb-6 text-foreground tracking-tight">
+              FileFlow
             </h1>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Convert images, videos, audio files, and documents instantly with our powerful
-              online tool
+            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+              Professional file conversion tool. Transform images, videos, audio, and documents with precision and speed.
             </p>
           </div>
 
           {/* Category Selection */}
-          <div className="mb-8 animate-slide-up">
-            <h2 className="text-2xl font-semibold mb-6 text-center">Choose File Type</h2>
+          <div className="mb-12 animate-slide-up">
+            <h2 className="text-xl font-semibold mb-6 text-foreground">Select File Type</h2>
             <CategorySelector
               selectedCategory={selectedCategory}
               onCategoryChange={handleCategoryChange}
@@ -991,10 +989,10 @@ const Index = () => {
           </div>
 
           {/* Main Converter Area */}
-          <div className="max-w-3xl mx-auto space-y-6 animate-slide-up" style={{ animationDelay: "0.1s" }}>
+          <div className="max-w-4xl mx-auto space-y-6 animate-slide-up" style={{ animationDelay: "0.1s" }}>
             {/* File Upload */}
             <div>
-              <h3 className="text-lg font-semibold mb-3">Upload Files</h3>
+              <h3 className="text-lg font-semibold mb-4 text-foreground">Upload Files</h3>
               <FileUploader
                 onFilesSelect={handleFilesSelect}
                 acceptedTypes={acceptedTypesByCategory[selectedCategory]}
@@ -1141,50 +1139,52 @@ const Index = () => {
 
             {/* Convert Button */}
             {selectedFiles.length > 0 && (
-              <div className="animate-scale-in space-y-3">
+              <div className="animate-scale-in space-y-4">
                 {selectedCategory === "image" && outputFormat === "PDF" && (
-                  <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/10 border border-primary/20">
-                    <FileText className="w-4 h-4 text-primary" />
-                    <p className="text-sm font-medium text-primary">
+                  <div className="flex items-center gap-3 p-4 rounded-lg bg-accent/5 border border-accent/20">
+                    <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
+                      <FileText className="w-5 h-5 text-accent" />
+                    </div>
+                    <p className="text-sm font-medium text-foreground">
                       {selectedFiles.length} image{selectedFiles.length > 1 ? 's' : ''} will be combined into a single PDF
                     </p>
                   </div>
                 )}
                 {selectedFiles.length > 1 && selectedCategory !== "image" && outputFormat !== "PDF" && (
-                  <div className="flex items-center gap-2 p-3 rounded-lg bg-accent/10 border border-accent/20">
-                    <Package className="w-4 h-4 text-accent" />
-                    <p className="text-sm font-medium text-accent">
+                  <div className="flex items-center gap-3 p-4 rounded-lg bg-secondary border border-border">
+                    <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
+                      <Package className="w-5 h-5 text-accent" />
+                    </div>
+                    <p className="text-sm font-medium text-foreground">
                       Multiple files will be downloaded as a ZIP archive
                     </p>
                   </div>
                 )}
-                <div className="flex gap-3">
-                  <Button
-                    onClick={handleConvert}
-                    disabled={isConverting}
-                    className="flex-1 h-12 text-lg font-semibold bg-gradient-primary hover:opacity-90 transition-opacity shadow-glow"
-                  >
-                      {isConverting ? (
-                      <>
-                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                        {selectedCategory === "compress" ? "Compressing" : 
-                         selectedCategory === "merge" ? "Merging" :
-                         selectedCategory === "split" ? "Splitting" :
-                         selectedCategory === "watermark" ? "Watermarking" :
-                         selectedCategory === "background-removal" ? "Processing" : "Converting"} {selectedFiles.length} file{selectedFiles.length > 1 ? 's' : ''}...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="w-5 h-5 mr-2" />
-                        {selectedCategory === "compress" ? "Compress & Download" :
-                         selectedCategory === "merge" ? "Merge & Download" :
-                         selectedCategory === "split" ? "Split & Download" :
-                         selectedCategory === "watermark" ? "Apply Watermark & Download" :
-                         selectedCategory === "background-removal" ? "Remove Background & Download" : "Convert & Download"}
-                      </>
-                    )}
-                  </Button>
-                </div>
+                <Button
+                  onClick={handleConvert}
+                  disabled={isConverting}
+                  className="w-full h-14 text-base font-semibold bg-primary text-primary-foreground hover:bg-primary/90 shadow-elevated"
+                >
+                    {isConverting ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin mr-2" />
+                      {selectedCategory === "compress" ? "Compressing" : 
+                       selectedCategory === "merge" ? "Merging" :
+                       selectedCategory === "split" ? "Splitting" :
+                       selectedCategory === "watermark" ? "Watermarking" :
+                       selectedCategory === "background-removal" ? "Processing" : "Converting"} {selectedFiles.length} file{selectedFiles.length > 1 ? 's' : ''}...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-5 h-5 mr-2" />
+                      {selectedCategory === "compress" ? "Compress & Download" :
+                       selectedCategory === "merge" ? "Merge & Download" :
+                       selectedCategory === "split" ? "Split & Download" :
+                       selectedCategory === "watermark" ? "Apply Watermark" :
+                       selectedCategory === "background-removal" ? "Remove Background" : "Convert & Download"}
+                    </>
+                  )}
+                </Button>
               </div>
             )}
           </div>
@@ -1192,33 +1192,33 @@ const Index = () => {
       </div>
 
       {/* Features Section */}
-      <div className="container mx-auto px-4 py-16">
-        <div className="grid md:grid-cols-3 gap-8">
-          <div className="text-center p-6 rounded-xl hover:shadow-card transition-shadow">
-            <div className="w-12 h-12 bg-gradient-primary rounded-xl mx-auto mb-4 flex items-center justify-center">
-              <Sparkles className="w-6 h-6 text-white" />
+      <div className="container mx-auto px-6 py-20 border-t border-border mt-20">
+        <div className="grid md:grid-cols-3 gap-10">
+          <div className="text-center p-8 rounded-xl bg-card border border-border hover:shadow-elevated transition-all">
+            <div className="w-14 h-14 bg-accent/10 rounded-xl mx-auto mb-5 flex items-center justify-center border border-accent/20">
+              <Sparkles className="w-7 h-7 text-accent" />
             </div>
-            <h3 className="font-semibold mb-2">Lightning Fast</h3>
-            <p className="text-sm text-muted-foreground">
-              Convert files in seconds with our optimized processing
+            <h3 className="font-semibold text-lg mb-3 text-foreground">Lightning Fast</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Convert files instantly with optimized processing technology
             </p>
           </div>
-          <div className="text-center p-6 rounded-xl hover:shadow-card transition-shadow">
-            <div className="w-12 h-12 bg-gradient-accent rounded-xl mx-auto mb-4 flex items-center justify-center">
-              <Sparkles className="w-6 h-6 text-white" />
+          <div className="text-center p-8 rounded-xl bg-card border border-border hover:shadow-elevated transition-all">
+            <div className="w-14 h-14 bg-accent/10 rounded-xl mx-auto mb-5 flex items-center justify-center border border-accent/20">
+              <FileText className="w-7 h-7 text-accent" />
             </div>
-            <h3 className="font-semibold mb-2">Multiple Formats</h3>
-            <p className="text-sm text-muted-foreground">
-              Support for all major file formats across categories
+            <h3 className="font-semibold text-lg mb-3 text-foreground">Universal Support</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Handle all major file formats across multiple categories
             </p>
           </div>
-          <div className="text-center p-6 rounded-xl hover:shadow-card transition-shadow">
-            <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl mx-auto mb-4 flex items-center justify-center">
-              <Sparkles className="w-6 h-6 text-white" />
+          <div className="text-center p-8 rounded-xl bg-card border border-border hover:shadow-elevated transition-all">
+            <div className="w-14 h-14 bg-accent/10 rounded-xl mx-auto mb-5 flex items-center justify-center border border-accent/20">
+              <Package className="w-7 h-7 text-accent" />
             </div>
-            <h3 className="font-semibold mb-2">Secure & Private</h3>
-            <p className="text-sm text-muted-foreground">
-              Your files are processed securely and deleted after conversion
+            <h3 className="font-semibold text-lg mb-3 text-foreground">Privacy First</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Files processed securely in your browser. No uploads required.
             </p>
           </div>
         </div>
