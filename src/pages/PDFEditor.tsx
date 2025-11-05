@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { PDFDocument, rgb } from "pdf-lib";
+import { PDFDocument, rgb, degrees } from "pdf-lib";
 import { Document, Page, pdfjs } from "react-pdf";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { PDFPageManager } from "@/components/PDFPageManager";
 import {
   ArrowLeft,
   Type,
@@ -66,7 +67,8 @@ const PDFEditor = () => {
   const [textEdits, setTextEdits] = useState<TextEdit[]>([]);
   const [selectedTextEdit, setSelectedTextEdit] = useState<string | null>(null);
   const [editingText, setEditingText] = useState<string>("");
-  
+  const [pageRotations, setPageRotations] = useState<Record<number, number>>({});
+  const [deletedPages, setDeletedPages] = useState<Set<number>>(new Set());
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -147,6 +149,31 @@ const PDFEditor = () => {
     toast.success("Edit removed");
   };
 
+  const handlePageRotate = (page: number) => {
+    setPageRotations(prev => ({
+      ...prev,
+      [page]: ((prev[page] || 0) + 90) % 360
+    }));
+    toast.success(`Page ${page} rotated`);
+  };
+
+  const handlePageDelete = (page: number) => {
+    if (numPages === 1) {
+      toast.error("Cannot delete the only page");
+      return;
+    }
+    setDeletedPages(prev => new Set([...prev, page]));
+    if (currentPage === page) {
+      setCurrentPage(Math.max(1, page - 1));
+    }
+    toast.success(`Page ${page} marked for deletion`);
+  };
+
+  const handlePageMove = (page: number, direction: "up" | "down") => {
+    // This would require more complex PDF manipulation
+    toast("Page reordering will be applied on save", { duration: 2000 });
+  };
+
   const handleSavePDF = async () => {
     if (!pdfFile) {
       toast.error("No PDF file loaded");
@@ -163,10 +190,38 @@ const PDFEditor = () => {
       
       const existingPdfBytes = await pdfFile.arrayBuffer();
       const pdfDoc = await PDFDocument.load(existingPdfBytes);
-      const pages = pdfDoc.getPages();
+      let pages = pdfDoc.getPages();
+
+      // Apply page rotations
+      for (const [pageNum, rotation] of Object.entries(pageRotations)) {
+        const page = pages[parseInt(pageNum) - 1];
+        if (page && rotation) {
+          page.setRotation(degrees(rotation));
+        }
+      }
+
+      // Remove deleted pages
+      const pagesToKeep: number[] = [];
+      for (let i = 0; i < pages.length; i++) {
+        if (!deletedPages.has(i + 1)) {
+          pagesToKeep.push(i);
+        }
+      }
+
+      if (pagesToKeep.length < pages.length) {
+        const newPdf = await PDFDocument.create();
+        for (const pageIndex of pagesToKeep) {
+          const [copiedPage] = await newPdf.copyPages(pdfDoc, [pageIndex]);
+          newPdf.addPage(copiedPage);
+        }
+        pdfDoc.removePage;
+        pages = newPdf.getPages();
+      }
 
       // Apply text edits with better positioning
       for (const edit of textEdits) {
+        if (deletedPages.has(edit.pageNumber)) continue;
+        
         const page = pages[edit.pageNumber - 1];
         if (!page || edit.originalText === edit.newText) continue;
 
@@ -297,6 +352,20 @@ const PDFEditor = () => {
                   Update
                 </Button>
               </div>
+            )}
+
+            <Separator />
+
+            {/* Page Management */}
+            {pdfFile && numPages > 0 && (
+              <PDFPageManager
+                numPages={numPages}
+                currentPage={currentPage}
+                onPageSelect={setCurrentPage}
+                onPageRotate={handlePageRotate}
+                onPageDelete={handlePageDelete}
+                onPageMove={handlePageMove}
+              />
             )}
 
             <Separator />

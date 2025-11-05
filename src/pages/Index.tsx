@@ -2,9 +2,12 @@ import { useState } from "react";
 import { FileCategory, CategorySelector } from "@/components/CategorySelector";
 import { FileUploader } from "@/components/FileUploader";
 import { FormatSelector } from "@/components/FormatSelector";
+import { ImageResizeOptions } from "@/components/ImageResizeOptions";
+import { DownloadHistory, addToDownloadHistory } from "@/components/DownloadHistory";
+import { FilePreview } from "@/components/FilePreview";
 import { Button } from "@/components/ui/button";
 import { Navbar } from "@/components/Navbar";
-import { Sparkles, Package, FileText } from "lucide-react";
+import { Sparkles, Package, FileText, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
@@ -27,6 +30,10 @@ const Index = () => {
   const [watermarkText, setWatermarkText] = useState<string>("Watermark");
   const [watermarkOpacity, setWatermarkOpacity] = useState<number>(0.3);
   const [splitPageRange, setSplitPageRange] = useState<string>("1-3");
+  const [resizeWidth, setResizeWidth] = useState<number | null>(null);
+  const [resizeHeight, setResizeHeight] = useState<number | null>(null);
+  const [previewFile, setPreviewFile] = useState<File | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
   const { toast } = useToast();
 
   const acceptedTypesByCategory: Record<FileCategory, Record<string, string[]>> = {
@@ -475,6 +482,38 @@ const Index = () => {
     });
   };
 
+  const resizeImage = async (file: File, width: number | null, height: number | null): Promise<Blob> => {
+    const img = await loadImageFromFile(file);
+    const canvas = document.createElement('canvas');
+    
+    // Calculate dimensions
+    let targetWidth = width || img.width;
+    let targetHeight = height || img.height;
+    
+    if (width && !height) {
+      targetHeight = Math.round((img.height / img.width) * width);
+    } else if (height && !width) {
+      targetWidth = Math.round((img.width / img.height) * height);
+    }
+    
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+    
+    const ctx = canvas.getContext('2d')!;
+    ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+    
+    return new Promise((resolve, reject) => {
+      canvas.toBlob(
+        (blob) => {
+          if (blob) resolve(blob);
+          else reject(new Error('Failed to resize image'));
+        },
+        'image/png',
+        1.0
+      );
+    });
+  };
+
   const encodeAudioBufferToWav = async (audioBuffer: AudioBuffer): Promise<Blob> => {
     const numberOfChannels = audioBuffer.numberOfChannels;
     const length = audioBuffer.length * numberOfChannels * 2;
@@ -597,9 +636,12 @@ const Index = () => {
         const url = URL.createObjectURL(mergedBlob);
         const link = document.createElement("a");
         link.href = url;
-        link.download = `merged.${outputFormat.toLowerCase()}`;
+        const filename = `merged.${outputFormat.toLowerCase()}`;
+        link.download = filename;
         link.click();
         URL.revokeObjectURL(url);
+        
+        addToDownloadHistory(filename, "Merge files");
         
         toast({
           title: "Merge complete!",
@@ -616,9 +658,11 @@ const Index = () => {
           const url = URL.createObjectURL(splitBlobs[0]);
           const link = document.createElement("a");
           link.href = url;
-          link.download = `page.pdf`;
+          const filename = `page.pdf`;
+          link.download = filename;
           link.click();
           URL.revokeObjectURL(url);
+          addToDownloadHistory(filename, "Split PDF");
         } else {
           const zip = new JSZip();
           splitBlobs.forEach((blob, index) => {
@@ -629,9 +673,11 @@ const Index = () => {
           const url = URL.createObjectURL(zipBlob);
           const link = document.createElement("a");
           link.href = url;
-          link.download = "split_pages.zip";
+          const filename = "split_pages.zip";
+          link.download = filename;
           link.click();
           URL.revokeObjectURL(url);
+          addToDownloadHistory(filename, "Split PDF");
         }
         
         toast({
@@ -667,6 +713,7 @@ const Index = () => {
           link.download = watermarkedFiles[0].name;
           link.click();
           URL.revokeObjectURL(url);
+          addToDownloadHistory(watermarkedFiles[0].name, "Watermark");
         } else {
           const zip = new JSZip();
           watermarkedFiles.forEach((file) => {
@@ -677,9 +724,11 @@ const Index = () => {
           const url = URL.createObjectURL(zipBlob);
           const link = document.createElement("a");
           link.href = url;
-          link.download = "watermarked_files.zip";
+          const filename = "watermarked_files.zip";
+          link.download = filename;
           link.click();
           URL.revokeObjectURL(url);
+          addToDownloadHistory(filename, "Watermark");
         }
         
         toast({
@@ -708,6 +757,7 @@ const Index = () => {
           link.download = processedFiles[0].name;
           link.click();
           URL.revokeObjectURL(url);
+          addToDownloadHistory(processedFiles[0].name, "Background Removal");
         } else {
           const zip = new JSZip();
           processedFiles.forEach((file) => {
@@ -718,9 +768,11 @@ const Index = () => {
           const url = URL.createObjectURL(zipBlob);
           const link = document.createElement("a");
           link.href = url;
-          link.download = "bg_removed_files.zip";
+          const filename = "bg_removed_files.zip";
+          link.download = filename;
           link.click();
           URL.revokeObjectURL(url);
+          addToDownloadHistory(filename, "Background Removal");
         }
         
         toast({
@@ -768,11 +820,13 @@ const Index = () => {
           const url = URL.createObjectURL(zipBlob);
           const link = document.createElement("a");
           link.href = url;
-          link.download = `compressed_images_${Date.now()}.zip`;
+          const filename = `compressed_images_${Date.now()}.zip`;
+          link.download = filename;
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
           URL.revokeObjectURL(url);
+          addToDownloadHistory(filename, "Compression");
         } else {
           const url = URL.createObjectURL(compressedFiles[0].data);
           const link = document.createElement("a");
@@ -782,6 +836,7 @@ const Index = () => {
           link.click();
           document.body.removeChild(link);
           URL.revokeObjectURL(url);
+          addToDownloadHistory(compressedFiles[0].name, "Compression");
         }
 
         toast({
@@ -800,11 +855,14 @@ const Index = () => {
         
         const link = document.createElement("a");
         link.href = url;
-        link.download = `converted_images_${Date.now()}.pdf`;
+        const filename = `converted_images_${Date.now()}.pdf`;
+        link.download = filename;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
+
+        addToDownloadHistory(filename, "Images to PDF");
 
         toast({
           title: "Conversion complete!",
@@ -820,8 +878,14 @@ const Index = () => {
         let convertedBlob: Blob;
         
         if (selectedCategory === "image") {
+          // Resize image if dimensions specified
+          let processedBlob: Blob = file;
+          if (resizeWidth || resizeHeight) {
+            processedBlob = await resizeImage(file, resizeWidth, resizeHeight);
+          }
+          
           // Convert image to target format
-          const img = await loadImageFromFile(file);
+          const img = await loadImageFromFile(processedBlob as File);
           const canvas = document.createElement('canvas');
           canvas.width = img.width;
           canvas.height = img.height;
@@ -951,12 +1015,15 @@ const Index = () => {
         
         const link = document.createElement("a");
         link.href = url;
-        link.download = `converted_files_${Date.now()}.zip`;
+        const zipName = `converted_files_${Date.now()}.zip`;
+        link.download = zipName;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
 
+        addToDownloadHistory(zipName, `${selectedCategory} conversion`);
+        
         toast({
           title: "Conversion complete!",
           description: `${selectedFiles.length} files converted and downloaded as ZIP`,
@@ -972,6 +1039,8 @@ const Index = () => {
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
+
+        addToDownloadHistory(convertedFiles[0].name, `${selectedCategory} to ${outputFormat}`);
 
         toast({
           title: "Conversion complete!",
@@ -1018,11 +1087,31 @@ const Index = () => {
             />
           </div>
 
+          {/* Download History */}
+          <div className="mb-12 animate-slide-up" style={{ animationDelay: "0.05s" }}>
+            <DownloadHistory />
+          </div>
+
           {/* Main Converter Area */}
           <div className="max-w-4xl mx-auto space-y-6 animate-slide-up" style={{ animationDelay: "0.1s" }}>
             {/* File Upload */}
             <div>
-              <h3 className="text-lg font-semibold mb-4 text-foreground">Upload Files</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-foreground">Upload Files</h3>
+                {selectedFiles.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setPreviewFile(selectedFiles[0]);
+                      setShowPreview(true);
+                    }}
+                  >
+                    <Eye className="h-4 w-4 mr-2" />
+                    Preview
+                  </Button>
+                )}
+              </div>
               <FileUploader
                 onFilesSelect={handleFilesSelect}
                 acceptedTypes={acceptedTypesByCategory[selectedCategory]}
@@ -1041,6 +1130,16 @@ const Index = () => {
                   selectedFormat={outputFormat}
                   onFormatChange={setOutputFormat}
                 />
+
+                {/* Image Resize Options */}
+                {selectedCategory === "image" && (
+                  <ImageResizeOptions
+                    onResize={(width, height) => {
+                      setResizeWidth(width);
+                      setResizeHeight(height);
+                    }}
+                  />
+                )}
                 
                 {/* PDF Image Mode Selection */}
                 {selectedCategory === "image" && outputFormat === "PDF" && (
@@ -1220,6 +1319,13 @@ const Index = () => {
           </div>
         </div>
       </div>
+
+      {/* File Preview Modal */}
+      <FilePreview
+        file={previewFile}
+        open={showPreview}
+        onClose={() => setShowPreview(false)}
+      />
 
       {/* Features Section */}
       <div className="container mx-auto px-6 py-20 border-t border-border mt-20">
