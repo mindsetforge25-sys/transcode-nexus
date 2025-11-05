@@ -374,9 +374,17 @@ const Index = () => {
     env.allowLocalModels = false;
     env.useBrowserCache = true;
     
-    const segmenter = await pipeline('image-segmentation', 'Xenova/segformer-b0-finetuned-ade-512-512', {
-      device: 'webgpu',
+    toast({
+      title: "Loading AI model...",
+      description: "This may take a moment on first use"
     });
+    
+    // Use RMBG model which is specifically trained for background removal
+    const segmenter = await pipeline(
+      'image-segmentation', 
+      'briaai/RMBG-1.4',
+      { device: 'webgpu' }
+    );
     
     const img = await loadImageFromFile(file);
     const canvas = document.createElement('canvas');
@@ -400,11 +408,30 @@ const Index = () => {
     canvas.height = height;
     ctx.drawImage(img, 0, 0, width, height);
     
-    const imageData = canvas.toDataURL('image/jpeg', 0.8);
-    const result = await segmenter(imageData);
+    toast({
+      title: "Processing image..."
+    });
     
-    if (!result || !Array.isArray(result) || result.length === 0 || !result[0].mask) {
-      throw new Error('Invalid segmentation result');
+    const result = await segmenter(canvas.toDataURL('image/png'));
+    
+    if (!result || !Array.isArray(result) || result.length === 0) {
+      throw new Error('Failed to process image');
+    }
+    
+    // Find the mask with the largest area (usually the main subject)
+    let bestMask = result[0];
+    if (result.length > 1) {
+      let maxScore = 0;
+      for (const item of result) {
+        if (item.score && item.score > maxScore) {
+          maxScore = item.score;
+          bestMask = item;
+        }
+      }
+    }
+    
+    if (!bestMask.mask) {
+      throw new Error('No mask found in result');
     }
     
     const outputCanvas = document.createElement('canvas');
@@ -417,8 +444,11 @@ const Index = () => {
     const outputImageData = outputCtx.getImageData(0, 0, width, height);
     const data = outputImageData.data;
     
-    for (let i = 0; i < result[0].mask.data.length; i++) {
-      const alpha = Math.round((1 - result[0].mask.data[i]) * 255);
+    // Apply mask to alpha channel
+    const maskData = bestMask.mask.data;
+    for (let i = 0; i < maskData.length; i++) {
+      // Keep pixels where mask value is high (foreground)
+      const alpha = Math.round(maskData[i] * 255);
       data[i * 4 + 3] = alpha;
     }
     

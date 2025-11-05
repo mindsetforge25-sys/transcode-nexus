@@ -100,24 +100,31 @@ const PDFEditor = () => {
 
     const originalText = target.textContent || "";
     const computedStyle = window.getComputedStyle(target);
-    const fontSize = parseFloat(computedStyle.fontSize) / scale;
+    const fontSize = parseFloat(computedStyle.fontSize);
+
+    // Calculate position relative to the PDF page
+    const relativeX = (rect.left - parentRect.left) / scale;
+    const relativeY = (rect.top - parentRect.top) / scale;
+    const relativeWidth = rect.width / scale;
+    const relativeHeight = rect.height / scale;
+    const relativeFontSize = fontSize / scale;
 
     const newEdit: TextEdit = {
       id: Date.now().toString(),
       originalText,
       newText: originalText,
-      x: (rect.left - parentRect.left) / scale,
-      y: (rect.top - parentRect.top) / scale,
-      width: rect.width / scale,
-      height: rect.height / scale,
-      fontSize,
+      x: relativeX,
+      y: relativeY,
+      width: relativeWidth,
+      height: relativeHeight,
+      fontSize: relativeFontSize,
       pageNumber: currentPage,
     };
 
     setTextEdits([...textEdits, newEdit]);
     setSelectedTextEdit(newEdit.id);
     setEditingText(originalText);
-    toast.success("Text selected for editing");
+    toast.success("Text selected - edit in the sidebar");
   };
 
   const handleUpdateText = () => {
@@ -146,54 +153,68 @@ const PDFEditor = () => {
       return;
     }
 
+    if (textEdits.length === 0) {
+      toast.error("No edits to save");
+      return;
+    }
+
     try {
+      toast("Processing PDF...");
+      
       const existingPdfBytes = await pdfFile.arrayBuffer();
       const pdfDoc = await PDFDocument.load(existingPdfBytes);
       const pages = pdfDoc.getPages();
 
-      // Apply text edits
-      textEdits.forEach((edit) => {
+      // Apply text edits with better positioning
+      for (const edit of textEdits) {
         const page = pages[edit.pageNumber - 1];
-        if (page && edit.originalText !== edit.newText) {
-          const { height } = page.getSize();
-          
-          // Cover original text with white rectangle
-          page.drawRectangle({
-            x: edit.x,
-            y: height - edit.y - edit.height,
-            width: edit.width,
-            height: edit.height,
-            color: rgb(1, 1, 1),
-          });
+        if (!page || edit.originalText === edit.newText) continue;
 
-          // Draw new text
-          page.drawText(edit.newText, {
-            x: edit.x,
-            y: height - edit.y - edit.height + 2,
-            size: edit.fontSize,
-            color: rgb(0, 0, 0),
-          });
-        }
-      });
+        const { height } = page.getSize();
+        
+        // Calculate Y position (PDF coordinates start from bottom)
+        const pdfY = height - edit.y - edit.height;
+        
+        // Cover original text with white rectangle (slightly larger for better coverage)
+        page.drawRectangle({
+          x: Math.max(0, edit.x - 1),
+          y: pdfY - 1,
+          width: edit.width + 2,
+          height: edit.height + 2,
+          color: rgb(1, 1, 1),
+        });
+
+        // Draw new text with better positioning
+        const textSize = Math.max(8, Math.min(edit.fontSize, 72)); // Clamp font size
+        page.drawText(edit.newText, {
+          x: edit.x,
+          y: pdfY + (edit.height * 0.2), // Adjust baseline
+          size: textSize,
+          color: rgb(0, 0, 0),
+        });
+      }
 
       const pdfBytes = await pdfDoc.save();
-      const blob = new Blob([new Uint8Array(pdfBytes) as any], { type: "application/pdf" });
+      const blob = new Blob([new Uint8Array(pdfBytes)], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
       a.download = `edited-${pdfFile.name}`;
       a.click();
-      URL.revokeObjectURL(url);
-      toast.success("PDF saved successfully!");
+      
+      setTimeout(() => URL.revokeObjectURL(url), 100);
+      
+      toast.success(`PDF saved with ${textEdits.length} edit(s)!`);
     } catch (error) {
       console.error("Error saving PDF:", error);
-      toast.error("Failed to save PDF");
+      toast.error("Failed to save PDF. Try with fewer edits or a simpler PDF.");
     }
   };
 
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
-    toast.success("PDF loaded - click on any text to edit it");
+    setCurrentPage(1);
+    toast.success(`PDF loaded (${numPages} page${numPages > 1 ? 's' : ''}) - Click any text to edit`);
   };
 
   useEffect(() => {
